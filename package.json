@@ -37,15 +37,20 @@
     "@forge-ahead/atlassian-api-types": "github:ibuchanan/forge-ahead-atlassian-api-types",
     "@forge-ahead/errors": "github:ibuchanan/forge-ahead-errors",
     "@forge-ahead/logging": "github:ibuchanan/forge-ahead-logging",
-    "@forge-ahead/triggers": "github:ibuchanan/forge-ahead-triggers"
+    "@forge-ahead/triggers": "github:ibuchanan/forge-ahead-triggers",
+    "@forge/api": "8.3.0",
+    "@forge/kvs": "2.1.0",
+    "json-rpc-2.0": "1.8.1"
   },
   "devDependencies": {
     "@ast-grep/cli": "0.50.0",
     "@biomejs/biome": "2.5.15",
     "@forge-ahead/prelint": "github:ibuchanan/tool-forge-prelint-ast-grep",
+    "@open-rpc/meta-schema": "1.14.9",
     "@size-limit/file": "14.2.0",
     "@types/node": "24",
     "@vitest/coverage-v8": "5.0.3",
+    "ajv": "8.20.0",
     "cspell": "10.3.6",
     "git-cliff": "2.14.2",
     "lefthook": "2.2.2",

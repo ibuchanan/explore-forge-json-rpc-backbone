@@ -1,36 +1,12 @@
-/**
- * @returns {import('@forge/api').WebTriggerResponse}
- */
-const buildOutput = (rnd) => ({
-  body: '{"hello": "world"}',
-  headers: {
-    'Content-Type': ['application/json'],
-    'X-Request-Id': [`rnd-${rnd}`]
-  },
-  statusCode: 200,
-  statusText: 'OK'
-});
+import type { WebTriggerRequest, WebTriggerResponse } from "@forge/api";
+import { kvs } from "@forge/kvs";
+import { handleHttp } from "./http";
 
-/**
- * @param {import('@forge/api').WebTriggerRequest} event
- * @param {import('@forge/api').WebTriggerContext} context
- * @returns {Promise<import('@forge/api').WebTriggerResponse>}
- */
-exports.runAsync = (event, context) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const result = buildOutput(Math.random());
-      resolve(result);
-    }, 1000);
-  });
+const store = {
+  get: () => kvs.get<string>("config.prefix"),
+  set: (prefix: string) => kvs.set("config.prefix", prefix),
 };
 
-/**
- * @param {import('@forge/api').WebTriggerRequest} event
- * @param {import('@forge/api').WebTriggerContext} context
- * @returns {import('@forge/api').WebTriggerResponse}
- */
-exports.runSync = (event, context) => {
-  const result = buildOutput(Math.random());
-  return result;
-};
+export function run(event: WebTriggerRequest): Promise<WebTriggerResponse> {
+  return handleHttp(event, process.env["RPC_BEARER_SECRET"], store);
+}
