@@ -1,10 +1,10 @@
 import {
+  createJSONRPCErrorResponse,
   JSONRPCErrorCode,
   JSONRPCErrorException,
-  JSONRPCServer,
-  createJSONRPCErrorResponse,
-  type JSONRPCResponse,
   type JSONRPCRequest,
+  type JSONRPCResponse,
+  JSONRPCServer,
 } from "json-rpc-2.0";
 
 export interface PrefixStore {

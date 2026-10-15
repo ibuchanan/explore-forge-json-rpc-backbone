@@ -13,20 +13,8 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "rootDir": ".",
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src",
-    "test",
-    "tests",
-    "vitest.config.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "coverage",
-    "specs"
-  ]
+  "include": ["src", "test", "tests", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "specs"]
 }

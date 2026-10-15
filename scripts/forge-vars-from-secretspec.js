@@ -8,17 +8,26 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 
 function readKeys() {
   const keys = JSON.parse(
-    readFileSync(new URL("../forge-variable-keys.json", import.meta.url), "utf8"),
+    readFileSync(
+      new URL("../forge-variable-keys.json", import.meta.url),
+      "utf8",
+    ),
   );
   if (
     !Array.isArray(keys) ||
-    keys.some((key) => typeof key !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) ||
+    keys.some(
+      (key) => typeof key !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key),
+    ) ||
     new Set(keys).size !== keys.length
   ) {
-    throw new Error("forge-variable-keys.json must be an array of unique environment-variable names");
+    throw new Error(
+      "forge-variable-keys.json must be an array of unique environment-variable names",
+    );
   }
   if (keys.some((key) => key.startsWith("FORGE_"))) {
-    throw new Error("FORGE_* keys target the CLI and must not be pushed as app variables");
+    throw new Error(
+      "FORGE_* keys target the CLI and must not be pushed as app variables",
+    );
   }
   return keys;
 }
@@ -51,7 +60,9 @@ function resolveSecretspecEnv(keys) {
 function main() {
   const keys = readKeys();
   if (keys.length === 0) {
-    console.log("No app-level Forge variables declared in forge-variable-keys.json. Add keys there and to secretspec.toml when needed.");
+    console.log(
+      "No app-level Forge variables declared in forge-variable-keys.json. Add keys there and to secretspec.toml when needed.",
+    );
     return;
   }
   const env = resolveSecretspecEnv(keys);
@@ -65,7 +76,15 @@ function main() {
   for (const key of keys) {
     execFileSync(
       "forge",
-      ["variables", "set", key, env[key], "--environment", environment, "--encrypt"],
+      [
+        "variables",
+        "set",
+        key,
+        env[key],
+        "--environment",
+        environment,
+        "--encrypt",
+      ],
       { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
     );
   }
@@ -75,6 +94,8 @@ try {
   main();
 } catch {
   // Child-process errors include commands and captured output, potentially values.
-  console.error("Forge variable push failed; check forge-variable-keys.json, secretspec.toml, and Forge authentication.");
+  console.error(
+    "Forge variable push failed; check forge-variable-keys.json, secretspec.toml, and Forge authentication.",
+  );
   process.exitCode = 1;
 }
