@@ -1,51 +1,62 @@
-> Please remove this quote block and replace the others with meaningful content. If you're looking at this on Bitbucket, be assured that it looks great on GitHub.
-
 # explore-forge-json-rpc-backbone
 
-[![Atlassian license](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+[![Apache 2.0 license][license-badge]](LICENSE)
+[![PRs welcome][prs-badge]](CONTRIBUTING.md)
 
-> Provide an introduction/overview of your project, and articulate the problem it solves for the broader engineering community. Potential consumers should understand **what** the project is, and **why** it exists.
+[license-badge]: https://img.shields.io/badge/license-Apache%202.0-blue
+[prs-badge]: https://img.shields.io/badge/PRs-welcome-brightgreen
 
-> Other recommended badges are a [version](https://shields.io/category/version) badge (e.g. `npm`) and a [build](https://shields.io/category/build) badge (e.g., `circleci` or `travis`). Order should be `license - version - build - PRs`. Please use the `flat-sqare` style.
->
-> See e.g.
->
-> [![npm version](https://img.shields.io/npm/v/react-beautiful-dnd.svg?style=flat-square)](https://www.npmjs.com/package/react-beautiful-dnd) [![npm version](https://img.shields.io/npm/v/@atlaskit/button.svg?style=flat-square)](https://www.npmjs.com/package/@atlaskit/button) [![Build Status](https://img.shields.io/travis/stricter/stricter/master?style=flat-square)](https://travis-ci.org/stricter/stricter)
+An early-stage Atlassian Forge architecture experiment: can one command
+implementation serve both a Forge UI resolver and an external web trigger
+without duplicating behavior or conflating their security models? This is a
+Forge app repository, not an installable JSON-RPC service or a published npm
+package (`package.json` marks it private).
 
+**Current state:** `manifest.yml` declares two v2 dynamic-response web
+triggers. Their handlers in `src/index.ts` return `{"hello": "world"}` and a
+random `X-Request-Id`; the asynchronous handler delays its response. There is
+no UI, command dispatcher, JSON-RPC protocol, product API operation, or
+implemented authentication. Web trigger URLs are public and these handlers
+accept unauthenticated requests. Do not use this code to process sensitive
+input or assume it is production-ready.
 
-## Usage
+## Try the repository locally
 
-> Provide a simple and concise (code) example of your project. Consumers should understand **how** your project solves their problem.
+Use Node.js 24 (see `.nvmrc`) and npm. Dependencies include GitHub-sourced
+packages, so installation needs access to them. From the repository root:
 
-## Installation
+```sh
+npm ci
+npm run test
+```
 
-> Provide instructions on how to install and configure the project.
+The Vitest script currently allows an empty test suite, so a passing run
+only confirms that the test runner starts; it does **not** verify the handlers
+or transport parity. `npm run check` is the broader pre-push gate, but the
+current checkout has existing source type errors and formatting failures.
+Deploying or installing is a separate, opt-in Forge operation; see
+[development guidance](DEVELOPMENT.md) and the `forge:*` scripts in
+`package.json` for this repository's environment-targeted workflow. Do not
+register a new app identity just to inspect this checkout.
 
-## Documentation
+## Proposed direction
 
-> If your project is small and simple enough, documentation can be added here. For larger projects, provide a link to where the documentation lives.
+The [POC spec](specs/spec.md) proposes a single, read-only `text.analyze`
+command invoked through a Custom UI resolver and an authenticated web trigger.
+Both adapters would pass requests to one dispatcher; each would establish its
+own trusted caller context. The spec narrows the earlier JSON-RPC blueprint to
+a single-request subset and calls for local **and** deployed UI/HTTP checks.
+None of that proposed behavior is available in the current handlers.
 
-## Tests
+## Read more
 
-> Describe and show how to run the tests with code examples.
-
-## Contributions
-
-Contributions to explore-forge-json-rpc-backbone are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+- [Why commands sit between transports and behavior](docs/explanation/explanation.md)
+  — architectural rationale and trade-offs.
+- [POC spec](specs/spec.md) — proposed scope, contract, security, and test
+  criteria.
+- [Development](DEVELOPMENT.md) — checks and repository layout.
+- [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md).
 
 ## License
 
-Copyright (c) [YYYY] Atlassian US., Inc.
-Apache 2.0 licensed, see [LICENSE](LICENSE) file.
-
-<br/>
-
-> Pick one of the following:
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-cheers.png)](https://www.atlassian.com)
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks.png)](https://www.atlassian.com)
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-with-thanks-light.png)](https://www.atlassian.com)
-
-[![With ❤️ from Atlassian](https://raw.githubusercontent.com/atlassian-internal/oss-assets/master/banner-cheers-light.png)](https://www.atlassian.com)
+Apache 2.0; see [LICENSE](LICENSE).
