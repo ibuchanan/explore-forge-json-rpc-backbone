@@ -89,20 +89,55 @@ secretspec set --provider project_secrets --profile default RPC_BEARER_SECRET
 ```
 
 For a new credential or an approved rotation, generate 32 random bytes as a
-64-character hexadecimal token and pass it directly on stdin. Run in Bash:
+64-character hexadecimal token and pass it directly on stdin. Choose **one**
+of the following generators. Run the pipeline in Bash with `pipefail` and
+shell tracing disabled. Verify the `project_secrets` binding first: the
+pipeline writes wherever that alias points.
+
+#### Apple system LibreSSL
+
+On macOS, use `/usr/bin/openssl` explicitly. If an inherited `OPENSSL_CONF`
+points at an OpenSSL 3/4 configuration, Apple's LibreSSL cannot load its
+`providers` module. Remove that override for the generator invocation only:
 
 ```sh
 set -o pipefail
 set +x
-openssl rand -hex 32 | tr -d '\n' |
+env -u OPENSSL_CONF /usr/bin/openssl rand -hex 32 | tr -d '\n' |
   secretspec set --provider project_secrets --profile default \
     --from-file - RPC_BEARER_SECRET
 ```
 
-Choose one method, not both. Verify the `project_secrets` binding first; the
-pipeline writes wherever that alias points. Stop on any error. If OpenSSL reports
-provider/configuration errors, fix the executable/configuration mismatch
-before retrying; do not disable approved crypto policy to suppress the error.
+`env -u` leaves your shell and SecretSpec's environment unchanged; LibreSSL
+uses its own default configuration. It does not force an empty config with
+`OPENSSL_CONF=/dev/null`. If your organization requires the inherited crypto
+configuration, use a compatible approved Homebrew executable instead; do not
+bypass that policy.
+
+#### Homebrew OpenSSL 3 or 4
+
+Select an installed formula by its prefix rather than assuming `openssl` on
+`PATH` is Homebrew's. Use `openssl@3` below, or replace it with `openssl@4`:
+
+```sh
+set -o pipefail
+set +x
+openssl_prefix=$(brew --prefix openssl@3) &&
+  "$openssl_prefix/bin/openssl" rand -hex 32 | tr -d '\n' |
+    secretspec set --provider project_secrets --profile default \
+      --from-file - RPC_BEARER_SECRET
+```
+
+`brew --prefix` works with both Apple Silicon and Intel Homebrew locations.
+This option retains `OPENSSL_CONF`; it must match the selected OpenSSL
+version and installed provider modules. Check the executable without generating
+a token with `"$(brew --prefix openssl@3)/bin/openssl" version` (or
+`openssl@4`). If configuration errors persist, correct the executable/config
+pair rather than globally clearing crypto settings.
+
+On other platforms with a correctly configured OpenSSL on `PATH`, the generator
+can simply be `openssl rand -hex 32` in the same stdin pipeline. Stop on any
+error; do not upload or deploy after a failed generation or write.
 Do not print the token, put it in `.env`, or pass it as a command argument.
 Do not regenerate it on routine deployments. Coordinate rotations with API
 operators, who must send the matching `Authorization: Bearer` credential;
@@ -120,8 +155,8 @@ SECRETSPEC_PROFILE=default bun run fence-rider doctor --resolve
 
 These commands may access the provider or request authentication. Expect all
 four declarations in the full-profile report and only `RPC_BEARER_SECRET` in
-the runtime report. Even `lint:forge` resolves required runtime values; fix a
-missing token rather than weakening the declaration or bypassing the wrapper.
+the runtime report. Even `lint:check:forge` resolves required runtime values;
+fix a missing token rather than weakening the declaration or bypassing the wrapper.
 Do not use `get`, `export`, or environment dumps to debug real secret values.
 
 Storing the token locally does not provision Forge. With explicit approval for
@@ -140,14 +175,22 @@ into commands here: this repository uses the `forge:*` names in `package.json`.
 
 ## Run repository checks
 
-Run the checks before sending a pull request:
+Run `npm run check` before sending a pull request. Package scripts own the
+validation pipeline: `check` explicitly lists the required lint tasks,
+typechecking, formatting, tests, and bundle-size check. Independent checks run
+in parallel with labeled output through `npm-run-all2`.
+
+Use `npm run lint` for all `lint:check:*` tasks: Biome, Forge, pre-deployment
+lint, typechecking, and formatting. Run individual tasks such as
+`lint:check:forge` or `lint:check:biome` for focused feedback. Documentation
+lint stays a separate command. Lefthook's pre-push hook only calls
+`npm run check`; pre-commit retains secret scanning and auto-formatting.
+
+Run the full pipeline and optional documentation check with:
 
 ```sh
-npm run lint
+npm run check
 npm run lint:docs
-npm run format:check
-npm run typecheck
-npm run test
 ```
 
 Shared tooling validation is documented upstream. This app no longer includes

@@ -15,7 +15,7 @@ workflows. Those guides are maintained upstream rather than duplicated here.
 - Define these aliases in user-global `[defaults.providers]`, not the project's
   `[providers]` table. Follow the [setup instructions](../../DEVELOPMENT.md#configure-this-repositorys-variables)
   to bind aliases, reuse existing values, and verify resolution.
-- Use the `forge:*` and `lint:forge` scripts in
+- Use the `forge:*` and `lint:check:forge` scripts in
   [`package.json`](../../package.json) from the repository root. Upload runtime
   values with `forge:variables:set` when they change; `forge:deploy` does not
   upload them. Review the target and obtain approval before remote changes.
