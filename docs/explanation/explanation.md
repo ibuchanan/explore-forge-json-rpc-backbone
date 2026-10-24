@@ -25,7 +25,7 @@ input into the same request; the dispatcher then applies the shared validation,
 method lookup, source policy, and error mapping. A local test could exercise
 that seam without a browser or deployed HTTP endpoint.
 
-The separation is about *behavior*, not identity. A resolver can derive an
+The separation is about _behavior_, not identity. A resolver can derive an
 Atlassian user from server-side Forge context. A web trigger is a public URL
 with no Atlassian user attached; an authenticated external client would be a
 different actor. The adapters must establish identity from trusted inputs and

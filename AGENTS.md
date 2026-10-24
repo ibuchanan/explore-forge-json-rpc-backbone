@@ -26,9 +26,10 @@ This repository is an Atlassian Forge app.
 - Use `npm run typecheck` and `npm run test` for focused feedback.
   The Forge test runner is Vitest.
 - Run `npm run lint:forge` after manifest changes.
-- Use the generated `forge:*` scripts from the repository root. They supply
-  SecretSpec targeting values and command-specific flags; do not bypass them
-  or copy flags between CLI commands.
+- Use the `forge:*` and `lint:forge` scripts from the repository root. They use
+  Fence Rider and SecretSpec for configuration and command-specific flags;
+  registration alone calls Forge directly. Do not bypass the wrappers or copy
+  flags between CLI commands.
 - Do not register, deploy, install, upgrade, or uninstall without approval.
   Registration creates a new app identity; it is not routine maintenance.
 - After scope or egress changes, use `npm run forge:deploy`, followed by

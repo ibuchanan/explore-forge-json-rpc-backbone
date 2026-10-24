@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -8,7 +8,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!!**/specs", "!!**/dist"]
+    "includes": ["**", "!!**/dist", "!!**/specs", "!!**/vendor"]
   },
   "formatter": {
     "enabled": true,
@@ -19,6 +19,7 @@
     "rules": {
       "preset": "recommended",
       "complexity": {
+        // Conflicts with TypeScript `noPropertyAccessFromIndexSignature`
         "useLiteralKeys": "off"
       }
     }
@@ -27,6 +28,10 @@
     "formatter": {
       "quoteStyle": "double"
     }
+  },
+  "markdown": {
+    // SKILL.md and similar files open with YAML frontmatter
+    "parser": { "frontmatter": true }
   },
   "assist": {
     "enabled": true,

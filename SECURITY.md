@@ -11,13 +11,11 @@ at risk before a fix is ready.
 
 We use **GitHub Private Vulnerability Reporting** to allow security researchers to disclose vulnerabilities directly to
 repository maintainers:
-
- 1. Navigate to the **Security** tab of this repository.
- 2. Click on **Advisories** under "**Reporting**".
- 3. Click **Report a vulnerability** to submit your report privately.
+1. Navigate to the **Security** tab of this repository.
+2. Click on **Advisories** under "**Reporting**".
+3. Click **Report a vulnerability** to submit your report privately.
 
 A good report usually includes:
-
 - What you found, and why you think it's a security issue
 - Steps to reproduce, or a proof of concept
 - The affected component (for example, a specific file in the repository, a module, or a connected endpoint)
@@ -42,7 +40,6 @@ or availability of this project or its users. We welcome reports on the followin
 ### Out-of-Scope
 
 In line with Atlassian security requirements, the following types of findings are out of scope for this repository:
-
 - Reports of vulnerable sub-dependencies without demonstrating how the vulnerability can be triggered through this specific
   repository.
 - Raw reports from automated scanners or Static Application Security Testing (SAST) tools or generic CVE filings without a
