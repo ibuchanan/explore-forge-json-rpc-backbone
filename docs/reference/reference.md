@@ -1,14 +1,13 @@
 # Reference
 
-This is just a placeholder.
-Remove this file
-when a real reference is ready.
+- [OpenRPC contract](openrpc.json): machine-readable JSON-RPC API declaration.
+- [SecretSpec app declaration](../../secretspec.toml): required names, provider
+  routes, defaults, and runtime scope for this app.
+- [Package scripts](../../package.json): configured Forge workflows and checks.
+- [Fence Rider documentation][fence-rider-docs]: shared configuration and command
+  reference, security rationale, and tooling validation.
+- [Historical configuration validation record](../../specs/secretspec-validation.md):
+  evidence from this app's original documentation pass, not a current tooling
+  verification report.
 
-[Diataxis](https://diataxis.fr/reference/) explains:
-
-> Reference guides are technical descriptions of the machinery and how to
-> operate it. Reference material is information-oriented.
-
-In the context of Forge sample apps,
-typical reference docs will capture APIs
-surfaced by webtriggers or `apiRoute`.
+[fence-rider-docs]: https://github.com/ibuchanan/ranch-rig-fence-rider#documentation

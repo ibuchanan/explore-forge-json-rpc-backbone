@@ -23,7 +23,8 @@
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -244,6 +245,7 @@ $RECYCLE.BIN/
 .fallow/
 .scratch/
 .session/
+tmp/
 
 # CocoIndex Code (ccc)
 /.cocoindex_code/

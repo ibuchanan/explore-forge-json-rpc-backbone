@@ -54,6 +54,8 @@ None of that proposed behavior is available in the current handlers.
   — architectural rationale and trade-offs.
 - [POC spec](specs/spec.md) — proposed scope, contract, security, and test
   criteria.
+- [Forge app configuration](docs/how-to/how-to.md) — this app's requirements
+  and links to the shared SecretSpec and Fence Rider documentation.
 - [Development](DEVELOPMENT.md) — checks and repository layout.
 - [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md).
 
