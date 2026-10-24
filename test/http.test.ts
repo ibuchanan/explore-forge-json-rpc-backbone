@@ -1,6 +1,7 @@
+import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
-import { handleHttp } from "../src/http";
 import type { PrefixStore } from "../src/commands";
+import { handleHttp } from "../src/http";
 
 const request = (method: string, params: object = {}) => ({
   jsonrpc: "2.0",
@@ -55,35 +56,104 @@ describe("public web trigger boundary", () => {
     });
   });
 
-  it("rejects missing, invalid, malformed, duplicated and unconfigured credentials without dispatch", async () => {
+  it("accepts case-insensitive header names and JSON media types", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.mixedCase(fc.constant("authorization")),
+        fc.mixedCase(fc.constant("content-type")),
+        fc.mixedCase(
+          fc.constantFrom(
+            "application/json",
+            "application/json; charset=utf-8",
+          ),
+        ),
+        async (authorization, contentType, media) => {
+          const response = await handleHttp(
+            makeEvent({
+              [authorization]: [`Bearer ${secret}`],
+              [contentType]: [media],
+            }),
+            secret,
+            memory(),
+          );
+          expect(response.statusCode).toBe(200);
+          expect(body(response)).toHaveProperty("result.configured", false);
+        },
+      ),
+    );
+  });
+
+  it("rejects missing, invalid, malformed and duplicated credentials without dispatch", async () => {
+    const invalidAuthorization: fc.Arbitrary<Record<string, string[]>> =
+      fc.oneof(
+        fc.constant({}),
+        fc
+          .stringMatching(/^[A-Za-z0-9._~+/-]{1,128}={0,2}$/)
+          .filter((token) => token !== secret)
+          .map((token) => ({ Authorization: [`Bearer ${token}`] })),
+        fc
+          .constantFrom(
+            `Basic ${secret}`,
+            `Bearer ${secret} `,
+            `Bearer ${secret}\n`,
+            "Bearer ",
+          )
+          .map((value) => ({ Authorization: [value] })),
+        fc
+          .array(fc.constant(`Bearer ${secret}`), {
+            minLength: 2,
+            maxLength: 4,
+          })
+          .map((Authorization) => ({ Authorization })),
+        fc
+          .mixedCase(fc.constant("authorization"))
+          .filter((name) => name !== "Authorization")
+          .map((name) => ({
+            Authorization: [`Bearer ${secret}`],
+            [name]: [`Bearer ${secret}`],
+          })),
+      );
+    await fc.assert(
+      fc.asyncProperty(invalidAuthorization, async (authorization) => {
+        const store = {
+          get: vi.fn(async () => undefined),
+          set: vi.fn(async () => {}),
+        };
+        const response = await handleHttp(
+          makeEvent({
+            "Content-Type": ["application/json"],
+            ...authorization,
+          }),
+          secret,
+          store,
+        );
+        expect(response.statusCode).toBe(401);
+        expect(JSON.stringify(response)).not.toContain(secret);
+        expect(store.get).not.toHaveBeenCalled();
+        expect(store.set).not.toHaveBeenCalled();
+      }),
+      {
+        examples: [
+          [{}],
+          [{ Authorization: ["Bearer a-private-test-token-wrong"] }],
+          [{ Authorization: [`Basic ${secret}`] }],
+          [{ Authorization: [`Bearer ${secret}`, `Bearer ${secret}`] }],
+          [
+            {
+              Authorization: [`Bearer ${secret}`],
+              authorization: [`Bearer ${secret}`],
+            },
+          ],
+        ],
+      },
+    );
+  });
+
+  it("rejects unconfigured credentials without dispatch", async () => {
     const store = {
       get: vi.fn(async () => undefined),
       set: vi.fn(async () => {}),
     };
-    for (const headers of [
-      { "Content-Type": ["application/json"] },
-      {
-        "Content-Type": ["application/json"],
-        Authorization: ["Bearer a-private-test-token-wrong"],
-      },
-      {
-        "Content-Type": ["application/json"],
-        Authorization: ["Basic a-private-test-token-long-enough"],
-      },
-      {
-        "Content-Type": ["application/json"],
-        Authorization: [`Bearer ${secret}`, `Bearer ${secret}`],
-      },
-      {
-        "Content-Type": ["application/json"],
-        Authorization: [`Bearer ${secret}`],
-        authorization: [`Bearer ${secret}`],
-      },
-    ]) {
-      const response = await handleHttp(makeEvent(headers), secret, store);
-      expect(response.statusCode).toBe(401);
-      expect(JSON.stringify(response)).not.toContain(secret);
-    }
     expect((await handleHttp(makeEvent(), undefined, store)).statusCode).toBe(
       503,
     );
@@ -91,7 +161,49 @@ describe("public web trigger boundary", () => {
     expect(store.set).not.toHaveBeenCalled();
   });
 
-  it("rejects wrong verb, media type, oversize and malformed JSON", async () => {
+  it("enforces the inclusive 16 KiB body limit in UTF-8 bytes, not UTF-16 units", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ unit: "binary", maxLength: 64 }),
+        fc.integer({ min: 16_383, max: 16_385 }),
+        async (id, bytes) => {
+          const json = JSON.stringify({ ...request("config.get"), id });
+          const payload =
+            json + " ".repeat(bytes - Buffer.byteLength(json, "utf8"));
+          const store = {
+            get: vi.fn(async () => undefined),
+            set: vi.fn(async () => {}),
+          };
+          const response = await handleHttp(
+            makeEvent(undefined, payload),
+            secret,
+            store,
+          );
+          if (bytes > 16_384) {
+            expect(response.statusCode).toBe(413);
+            expect(store.get).not.toHaveBeenCalled();
+          } else {
+            expect(response.statusCode).toBe(200);
+            expect(body(response)).toEqual({
+              jsonrpc: "2.0",
+              id,
+              result: { configured: false, prefix: null },
+            });
+          }
+          expect(store.set).not.toHaveBeenCalled();
+        },
+      ),
+      {
+        examples: [
+          ["😀", 16_383],
+          ["😀", 16_384],
+          ["😀", 16_385],
+        ],
+      },
+    );
+  });
+
+  it("rejects wrong verb, media type and malformed JSON", async () => {
     const store = {
       get: vi.fn(async () => undefined),
       set: vi.fn(async () => {}),
@@ -112,15 +224,6 @@ describe("public web trigger boundary", () => {
         )
       ).statusCode,
     ).toBe(415);
-    expect(
-      (
-        await handleHttp(
-          makeEvent(undefined, "x".repeat(16_385)),
-          secret,
-          store,
-        )
-      ).statusCode,
-    ).toBe(413);
     const malformed = await handleHttp(
       makeEvent(undefined, "{"),
       secret,
