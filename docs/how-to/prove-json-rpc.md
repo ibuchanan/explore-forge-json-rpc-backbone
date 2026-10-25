@@ -31,6 +31,8 @@ It does not change Jira issues or call a third-party API.
   `FORGE_SITE`, `FORGE_PRODUCT`, and `FORGE_ENVIRONMENT` controls.
   Bind `project_secrets` to an approved backend
   with project/profile isolation for `RPC_BEARER_SECRET`.
+  Bind `project_config` to writable isolated non-secret storage for URLs
+  and the test-write acknowledgement.
   Aliases belong in user-global `[defaults.providers]`.
 - Use `npm run forge:deploy`,
   then `npm run forge:upgrade` for an existing installation
@@ -60,79 +62,67 @@ before saving again. Never reset a value you must retain; use read/preview
 comparisons instead. The verifier does not reset automatically, and HTTP callers
 cannot invoke `config.reset`, even with a valid token.
 
-## Get the web-trigger URL with Forge CLI
+## Save or reuse the web-trigger URL
 
 <!-- cspell:words webtrigger -->
 
-Run these commands from this repository's root,
-using an authenticated Forge CLI account with administrator access
-on the target Atlassian site.
-The app must already be deployed and installed there.
-Replace `example.atlassian.net` with your approved development site,
-and keep the environment aligned with your deployment.
-These URL-management commands use Forge directly:
-Fence Rider and this repository's package scripts do not wrap them.
-Continue using the repository wrappers for deployment and installation.
-
-### Find an existing URL
-
-List URLs for this app's web trigger in the selected installation:
+Finish the [local verification settings](../../DEVELOPMENT.md#configure-deployed-verification)
+first. Run from this repository's root with the app already deployed and installed,
+and an authenticated Forge CLI account with administrator access
+on the approved site:
 
 ```sh
-forge webtrigger list \
-  --site example.atlassian.net \
-  --product jira \
-  --environment development \
-  --functionKey config-rpc
+npm run forge:webtrigger:upsert
 ```
+
+The package script runs [`upsert-webtrigger.sh`](../../scripts/upsert-webtrigger.sh)
+under `secretspec run --scope ''`, following Fence Rider's injection pattern.
+
+### Upsert behavior
+
+- If SecretSpec supplies a nonempty `RPC_VERIFY_URL`, reuse it immediately.
+  No Forge lookup, HTTP probe, validation, or provider write is performed.
+- Otherwise, call `forge webtrigger create --site "$FORGE_SITE"`
+  `--product "$FORGE_PRODUCT" --environment "$FORGE_ENVIRONMENT"`
+  `--functionKey config-rpc`, capturing its output privately.
+  Accept exactly one bare HTTPS URL line and save it with
+  `secretspec set --provider project_config --from-file - RPC_VERIFY_URL`.
+  A creation or storage failure stops the flow;
+  it never falls back to another target.
+
+SecretSpec supplies the targets; no hostname, URL, or token needs to be copied into
+shell environment assignments. `SECRETSPEC_FILE` and `SECRETSPEC_PROFILE`
+select the same declaration/profile for reading and saving.
+The default profile is `default`.
+Fence Rider currently has no web-trigger subcommand, so this app-local script owns
+that step. Continue using Fence Rider's repository wrappers for deploy/install.
 
 The app identity comes from this checkout's `manifest.yml`.
 Despite the flag name, `--functionKey` takes the **web-trigger module key**,
 `config-rpc`, not the backing function key `rpc` or handler `index.run`.
-Check the selected site, product, and environment before using a returned URL.
+Repeated Forge `create` calls for the same installation and module return the same
+URL; they do not deploy or reinstall the app. Do not use `--readSecretKey`:
+that enables Forge's separate signed-request mode, not this app's bearer check.
 
-### Obtain a URL if none is listed
+The upsert script reports whether it reused or saved a URL, but does not print it.
+The deployed verifier consumes it automatically. For individual requests, configure
+your approved HTTP client to consume the SecretSpec-resolved `RPC_VERIFY_URL` and
+`RPC_BEARER_SECRET`, for example by launching that client under
+`secretspec run --scope '' -- <client-command>` with tracing disabled.
+The URL is a target, not a credential; requests still need the bearer header.
+Keep full URLs out of committed files and shared evidence.
 
-For the approved installation, run:
+**A stored URL is trusted, not rediscovered.** If you switch app identity, site,
+product, environment, or installation, deliberately clear the old saved URL with
+`secretspec delete --provider project_config RPC_VERIFY_URL`, review the new
+SecretSpec target, then run the upsert again. It does not detect stale URLs or
+change targets automatically. For a separate target/profile, use isolated provider
+storage rather than overwriting the primary URL.
 
-```sh
-forge webtrigger create \
-  --site example.atlassian.net \
-  --product jira \
-  --environment development \
-  --functionKey config-rpc
-```
-
-Forge displays the HTTPS URL to call.
-Despite the name, repeating `create` for the same installation context
-and web trigger returns the same URL;
-it does not deploy or reinstall the app.
-If you omit the selection flags, `forge webtrigger create` prompts you
-to choose the installation and web trigger instead.
-Do not select another environment or installation just to obtain a URL.
-
-### Use the returned URL
-
-Copy only the returned HTTPS URL into your HTTP client's request URL,
-or set it for the deployed verifier in the same terminal session:
-
-```sh
-export RPC_VERIFY_URL='PASTE_THE_RETURNED_HTTPS_URL_HERE'
-```
-
-Replace the placeholder with the actual URL; do not use the Jira admin page URL
-or construct a URL from the site hostname.
-The web-trigger URL identifies the invocation target, not a bearer credential.
-Requests still need this app's `Authorization: Bearer` header.
-Do not use `--readSecretKey`: that option is for Forge's separate
-signed-request authentication mode, not this app's bearer-token check.
-Keep the full URL out of committed files and shared evidence.
-For isolation checks, repeat URL discovery for the approved second installation
-and set its URL as `RPC_VERIFY_ISOLATION_URL`.
-
-See the Forge CLI references for
-[`webtrigger list`](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger-list/)
-and [`webtrigger create`](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger/).
+For read-only isolation checks, store an approved second installation's URL as
+`RPC_VERIFY_ISOLATION_URL` through `project_config`. Leave it empty when no second
+installation is intended. The suite never creates or writes to a second installation.
+See the Forge CLI [`webtrigger create` reference](https://developer.atlassian.com/platform/forge/cli-reference/webtrigger-create/).
 
 ## Trace HTTP execution in the checkout
 
@@ -370,39 +360,33 @@ The optional second installation must also be approved and have no saved prefix.
 
 ### Execute the suite
 
-1. Set `RPC_VERIFY_URL` in your operator environment
-   to the HTTPS URL obtained in
-   [Get the web-trigger URL with Forge CLI](#get-the-web-trigger-url-with-forge-cli).
-   URLs with
-   embedded credentials,
-   query parameters,
-   or fragments are rejected.
-   Confirm target identity independently.
-2. Optionally set `RPC_VERIFY_ISOLATION_URL`
-   to a distinct second installation of the same app
-   with the same environment secret.
-   It is read-only during this suite.
-   If unavailable, omit the variable;
-   isolation stays **unverified**.
-3. Confirm profile `default` resolves
-   `FORGE_ENVIRONMENT=development`,
-   `FORGE_PRODUCT=jira`,
-   a nonempty `FORGE_SITE`,
-   and `RPC_BEARER_SECRET`.
-   Review non-secret target settings against the approved URL.
-   With shell tracing disabled,
-   run from the repository root:
+1. Review the SecretSpec target and
+   [configure deployed verification](../../DEVELOPMENT.md#configure-deployed-verification).
+   The selected profile must resolve development, Jira, a nonempty site,
+   the existing bearer credential, and the stored test-write acknowledgement.
+   Confirm the stored primary URL belongs to that installation independently;
+   upsert trusts an available URL. The verifier still rejects URL syntax with
+   embedded credentials, query parameters, or fragments before HTTP calls.
+2. Optionally store `RPC_VERIFY_ISOLATION_URL` for a distinct approved installation
+   with the same environment secret. It is read-only during this suite.
+   Leave it empty when unavailable; isolation stays **unverified**.
+3. With shell tracing disabled, run from the repository root:
 
    ```sh
    set +x
-   RPC_VERIFY_APPROVED=development SECRETSPEC_PROFILE=default \
-     secretspec run --scope '' -- npm run test:deployed
+   npm run test:deployed
    ```
 
-   The acknowledgement does not discover approval.
-   This command makes live HTTP calls and attempts a test write;
-   it does not deploy, install, or upload secrets.
-   SecretSpec supplies the credential without putting it in argv.
+   The package script resolves the full profile through SecretSpec itself.
+   Do not wrap it in another `secretspec run` or hand-export target/token values.
+   [`test-deployed.sh`](../../scripts/test-deployed.sh) checks the stored
+   development acknowledgement and Jira target before any URL creation,
+   runs the URL upsert, and passes its URL to the verifier in the same process.
+   No second invocation or shell export is needed when a URL was just saved.
+   This command can create/store a missing URL, makes live HTTP calls,
+   and attempts a test write; it does not deploy, install, or upload runtime values.
+   The acknowledgement records operator intent; it does not grant permission
+   or prove that the configured URL belongs to the approved target.
 
 4. Save the sanitized JSON report in the approved evidence location.
    Exit 0 means the HTTP suite passed;
@@ -419,6 +403,11 @@ The optional second installation must also be approved and have no saved prefix.
 
 ### Check what the runner actually proved
 
+`npm run test:deployed` resolves SecretSpec, runs
+[`test-deployed.sh`](../../scripts/test-deployed.sh),
+and runs the primary URL upsert.
+Setup messages go to stderr and omit resolved URLs/credentials; a setup failure
+exits before the JSON report. Once setup succeeds,
 [`run.ts`](../../test/deployed/run.ts) invokes
 [`verifyDeployed`](../../test/deployed/verify.ts)
 with real `fetch`,
@@ -495,14 +484,19 @@ record target metadata separately without the full trigger URL.
 
 ### Diagnose by boundary
 
-- **`preflight` failed:** no HTTP request was made and configuration was not
-  inspected. Read `checks[].message` for the first failing setting. For example,
-  a missing `RPC_VERIFY_URL` now produces a field-specific HTTPS URL requirement,
-  without echoing the URL. Correct that setting and retry; subsequent invalid
-  settings appear one at a time. Export the URL in the same terminal, ensure
-  SecretSpec provides the development target and bearer secret, and unset
-  `RPC_VERIFY_ISOLATION_URL` if no second installation is intended. Never print
-  the secret to diagnose it. The report's `configurationMayHaveChanged` is false.
+- **Setup failed before a JSON report:** read the script's static stderr guidance.
+  Correct SecretSpec provider/target/acknowledgement resolution, Forge authentication,
+  or `project_config` write access as indicated. If Forge obtained a URL but storage
+  failed, fix the provider then rerun; Forge returns the same context's URL.
+  Neither the app verifier nor its test writes ran.
+  A URL may already have been created.
+- **`preflight` failed:** the verifier made no HTTP request and did not inspect
+  configuration. Read `checks[].message` for the first failing setting. Correct
+  it in SecretSpec, not by exporting shell values. An invalid cached URL needs
+  deliberate clearing followed by upsert; empty `RPC_VERIFY_ISOLATION_URL` disables
+  isolation checks. Never print the secret to diagnose it. The report's
+  `configurationMayHaveChanged` is false;
+  earlier URL setup is not an app-config write.
 - **`config.get unset` failed:** preflight passed and the first HTTP read did not
   match the expected unset response. If the UI has a saved prefix, this is the
   expected initial-state failure. Confirm target and authentication too; the

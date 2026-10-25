@@ -17,6 +17,7 @@
     "forge:uninstall": "cmd=$(fence-rider uninstall) && sh -c \"$cmd\" sh",
     "forge:upgrade": "cmd=$(fence-rider install -- --upgrade --confirm-scopes --non-interactive) && sh -c \"$cmd\" sh",
     "forge:variables:set": "fence-rider variables",
+    "forge:webtrigger:upsert": "secretspec run --scope '' -- sh scripts/upsert-webtrigger.sh",
     "format": "biome format --write",
     "format:check": "biome format",
     "lint": "run-p --npm-path npm --print-label \"lint:check:*\"",
@@ -31,7 +32,7 @@
     "size:check": "npm run build && size-limit",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "test:deployed": "bun run test/deployed/run.ts",
+    "test:deployed": "secretspec run --scope '' -- sh scripts/test-deployed.sh",
     "test:watch": "vitest watch --passWithNoTests",
     "todo": "git grep -n -I -F TO\"DO\" -- .; status=$?; if [ \"$status\" -eq 1 ]; then echo \"No TO\"\"DO markers found.\"; elif [ \"$status\" -ne 0 ]; then exit \"$status\"; fi",
     "typecheck": "tsc --project tsconfig.typecheck.json --noEmit"

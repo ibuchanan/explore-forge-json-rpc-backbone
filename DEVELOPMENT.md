@@ -1,5 +1,7 @@
 # Development
 
+<!-- cspell:words webtrigger -->
+
 Install dependencies with `npm install`. Forge wrappers also require Bun
 1.4.3+, SecretSpec 0.21.1+, and an authenticated Forge CLI on `PATH`.
 The `fence-rider` development dependency is installed from GitHub.
@@ -16,12 +18,15 @@ Run configuration commands from the repository root. The committed
 stable: providers such as the keyring namespace values by project and profile.
 Do not put credential values in the declaration or commit them anywhere.
 
-| Variable            | Provider alias    | Requirement                                        |
-| ------------------- | ----------------- | -------------------------------------------------- |
-| `FORGE_SITE`        | `shared_config`   | Required installation hostname, without `https://` |
-| `FORGE_PRODUCT`     | `shared_config`   | Installation product; defaults to `jira`           |
-| `FORGE_ENVIRONMENT` | `shared_config`   | Local Forge target; defaults to `development`      |
-| `RPC_BEARER_SECRET` | `project_secrets` | Required bearer token for this app's web trigger   |
+| Variable                   | Provider alias    | Requirement                                                   |
+| -------------------------- | ----------------- | ------------------------------------------------------------- |
+| `FORGE_SITE`               | `shared_config`   | Required installation hostname, without `https://`            |
+| `FORGE_PRODUCT`            | `shared_config`   | Installation product; defaults to `jira`                      |
+| `FORGE_ENVIRONMENT`        | `shared_config`   | Local Forge target; defaults to `development`                 |
+| `RPC_BEARER_SECRET`        | `project_secrets` | Required bearer token for this app's web trigger              |
+| `RPC_VERIFY_URL`           | `project_config`  | Primary URL saved by upsert; defaults to empty                |
+| `RPC_VERIFY_ISOLATION_URL` | `project_config`  | Optional read-only second installation URL; defaults to empty |
+| `RPC_VERIFY_APPROVED`      | `project_config`  | Test-write acknowledgement; defaults to `not-approved`        |
 
 Only `RPC_BEARER_SECRET` belongs to `[scopes.runtime]`. The `FORGE_*` controls
 are never uploaded. This app has no `manifest` scope. A SecretSpec profile is
@@ -43,8 +48,9 @@ secretspec config global provider add shared_config \
 The filename can be different; the committed app config depends on the alias,
 not the path. In user-global TOML, aliases belong under `[defaults.providers]`.
 Do not define these aliases in the app's `[providers]` table: project aliases
-override developers' bindings. This app needs only `shared_config` and
-`project_secrets`, not the unused `project_config` or `shared_secrets` roles.
+override developers' bindings. This app uses `shared_config`, `project_config`,
+and `project_secrets`; it does not use `shared_secrets`. Configure `project_config`
+for the verifier as described below, even when its optional URL values are empty.
 
 Set the site at the prompt and, if needed, override the product or environment:
 
@@ -143,6 +149,82 @@ Do not regenerate it on routine deployments. Coordinate rotations with API
 operators, who must send the matching `Authorization: Bearer` credential;
 share it only through an approved secret channel.
 
+### Configure deployed verification
+
+Bind `project_config` to writable non-secret storage isolated to this app and
+profile. If that alias already exists, verify its addressing instead of replacing
+it. For a new binding, Fence Rider's local-config convention uses a per-project
+ignored dotenv file:
+
+```sh
+secretspec config global provider add project_config 'dotenv:.env'
+```
+
+`.env` is already ignored by this repository. Ensure the relative path resolves
+to this app's file when running from its root. Use profile-aware backend references
+or separate files if you need multiple targets; a plain dotenv file does not
+isolate profiles by itself. Never store `RPC_BEARER_SECRET` in this config backend.
+Shared alias definitions remain in the operator's global SecretSpec configuration,
+not the committed project declaration.
+
+The verifier's inputs now live in SecretSpec, not shell assignments. The URL fields
+are optional and default to empty. With approval for the selected isolated
+**development Jira** installation and its test writes, record the acknowledgement:
+
+```sh
+secretspec set --provider project_config --profile default RPC_VERIFY_APPROVED development
+```
+
+This persists intent for repeat runs; it is not an authorization grant. Review the
+selected target each time. Revoke the acknowledgement when finished:
+
+```sh
+secretspec set --provider project_config --profile default RPC_VERIFY_APPROVED not-approved
+```
+
+After deployment and installation, use:
+
+```sh
+npm run forge:webtrigger:upsert
+npm run test:deployed
+```
+
+Both scripts resolve the full selected SecretSpec profile, like Fence Rider's
+existing wrappers; do not add an outer `secretspec run`. `test:deployed` also calls
+upsert, so the first command is optional. A stored primary URL is assumed valid
+without a Forge lookup. When absent, upsert obtains it through
+`forge webtrigger create` and saves it through `project_config` using stdin.
+A URL obtained this way is usable immediately in the same test run. Setup messages
+omit the URL, and a setup failure prevents the HTTP suite from starting.
+`SECRETSPEC_FILE` and `SECRETSPEC_PROFILE` apply to both resolution and persistence;
+no value flags or ambient target overrides are needed.
+
+When switching installation or environment, deliberately clear the stored URL
+before upsert; it does not automatically invalidate cached values:
+
+```sh
+secretspec delete --provider project_config --profile default RPC_VERIFY_URL
+```
+
+For an approved second installation, enter its URL at the SecretSpec prompt:
+
+```sh
+secretspec set --provider project_config --profile default RPC_VERIFY_ISOLATION_URL
+```
+
+Remove the stored optional URL to disable isolation checks:
+
+```sh
+secretspec delete --provider project_config --profile default RPC_VERIFY_ISOLATION_URL
+```
+
+Deletion restores the declaration's empty default; SecretSpec's dotenv provider
+rejects setting an empty stored value. The full suite requires no saved demo prefix
+and leaves `poc-😀` saved;
+follow the [JSON-RPC verification guide](docs/how-to/prove-json-rpc.md) for reset,
+approval, evidence, and failure handling. Neither script uploads these local
+verification settings; Fence Rider's `runtime` scope still contains only the token.
+
 ### Verify resolution and activate the runtime value
 
 Check the full profile and selected runtime names without printing values:
@@ -154,7 +236,7 @@ SECRETSPEC_PROFILE=default bun run fence-rider doctor --resolve
 ```
 
 These commands may access the provider or request authentication. Expect all
-four declarations in the full-profile report and only `RPC_BEARER_SECRET` in
+seven declarations in the full-profile report and only `RPC_BEARER_SECRET` in
 the runtime report. Even `lint:check:forge` resolves required runtime values;
 fix a missing token rather than weakening the declaration or bypassing the wrapper.
 Do not use `get`, `export`, or environment dumps to debug real secret values.
@@ -205,7 +287,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution process.
 - `docs/`: Diataxis guides, reference, explanations, and tutorials.
 - `specs/`: Specifications and reference material; excluded from Biome checks.
 - `dist/`: Build output; ignored by Git and excluded from Biome checks.
-- `test/`: Forge app tests (Vitest) and optional evaluations.
+- `scripts/`: SecretSpec-backed web-trigger URL upsert and deployed-test setup.
+- `test/`: Forge app tests (Vitest), isolated script checks, and the opt-in
+  deployed verifier.
 
 [fence-rider-docs]: https://github.com/ibuchanan/ranch-rig-fence-rider#documentation
 [fence-rider-local]: https://github.com/ibuchanan/ranch-rig-fence-rider/blob/main/docs/how-to/local.md

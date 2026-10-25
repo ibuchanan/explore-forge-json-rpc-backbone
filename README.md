@@ -1,5 +1,7 @@
 # explore-forge-json-rpc-backbone
 
+<!-- cspell:words webtrigger -->
+
 [![Apache 2.0 license][license-badge]](LICENSE)
 [![PRs welcome][prs-badge]](CONTRIBUTING.md)
 
@@ -48,7 +50,11 @@ The [POC spec](specs/spec.md) requires local **and** deployed UI/HTTP evidence.
 preview, and error checks, with a UI-to-resolver-to-command execution trace.
 [Prove it via JSON-RPC](docs/how-to/prove-json-rpc.md) covers HTTP requests and
 the deployed verifier, with the corresponding web-trigger execution trace.
-Both require separate approval for deployment, installation, and test writes.
+`npm run forge:webtrigger:upsert` saves or reuses the URL through SecretSpec;
+`npm run test:deployed` resolves its settings and runs the upsert automatically.
+See [verification configuration](DEVELOPMENT.md#configure-deployed-verification)
+first.
+Both guides require separate approval for deployment, installation, and test writes.
 The `read:jira-work` scope requires consent on existing installations that do
 not yet grant it. Do not infer live acceptance from local mocks.
 
