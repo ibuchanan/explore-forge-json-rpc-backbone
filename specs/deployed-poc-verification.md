@@ -2,10 +2,12 @@
 
 <!-- cspell:words prosemirror prelint brotlied -->
 
-Recorded: 2026-10-24. Implementation baseline: `37bfac0` (Ticket 03).
-Ticket 04 adds verification tooling; this record does not assert live acceptance.
+Originally recorded: 2026-10-24. Implementation baseline: `37bfac0` (Ticket 03).
+Ticket 04 added verification tooling without a live acceptance claim.
+The dated 2026-10-25 operator evidence below records a successful deployed HTTP
+run; installed UI, isolation, and production acceptance remain unverified.
 
-## Target and approval
+## Original target and approval record, 2026-10-24
 
 | Field | Observation |
 | --- | --- |
@@ -19,8 +21,9 @@ Ticket 04 adds verification tooling; this record does not assert live acceptance
 | Operator / date / browser | No live operator session recorded |
 
 No deployment, installation, upgrade, registration, tunnel, variable write,
-or live HTTP call was performed for this implementation. A configured default
-site is not approval to use that site.
+or live HTTP call was performed for that original implementation record.
+This historical table is not a description of the later operator-run suite.
+A configured default site is not approval to use that site.
 
 ## Local evidence
 
@@ -87,22 +90,77 @@ but fails the subsequent unset check with manual reset guidance. No automatic
 upload, deployment, credential rotation, or reset was added. This is local
 implementation evidence, not a new live acceptance claim.
 
+## Operator-reported deployed HTTP run, 2026-10-25
+
+Evidence source: the operator supplied the terminal narrative and sanitized JSON
+report from `npm run test:deployed` in this session and confirmed success.
+The assistant did not execute or independently repeat these live requests.
+Only the summary and check coverage are recorded here, not credentials, trigger
+URLs, raw responses, or the full terminal transcript.
+
+| Field | Reported evidence |
+| --- | --- |
+| Run ID | `f3af9b48-9191-4f45-85d3-561c9663324a` |
+| Started at | `2026-10-25T16:06:45.853Z` |
+| Result | `passed`; all 30 named checks passed |
+| Measured suite duration | `10480.660042` ms (approximately 10.48 seconds) |
+| Per-check duration range | Approximately 0.07–1318.78 ms; includes local checks, not only HTTP latency |
+| Configuration may have changed | `true`; save and separate read-back checks passed |
+| Final demo configuration | Test prefix `poc-😀` remains saved; no automatic reset/restoration |
+| Isolation / UI | Both `unverified` in the report |
+| Tooling reference / run revision | `c2006fb` contains this verifier; the report does not record the operator's local or deployed revision |
+| Target identity / deployed Forge version / tunnel state | Not established by the supplied report |
+| Setup effort / process exit code | Not separately recorded; report status is `passed` |
+
+The passing preflight is evidence that the runner accepted development Jira
+controls, not independent proof of installation identity. Passing deployed
+readiness establishes an authenticated, valid configuration response; it does
+not inspect Forge's encrypted variable store or establish how it was provisioned.
+
+| Coverage group | Passed checks | Observations |
+| --- | --- | --- |
+| Local settings, deployed readiness, initial state | 3 | Preflight, authenticated read, and unset state passed |
+| Authentication rejection | 4 | Absent, invalid, malformed, and combined duplicate authorization rejected |
+| HTTP request guards | 3 | Wrong verb, wrong media type, and oversized body rejected |
+| JSON-RPC and parameter validation | 10 | Malformed JSON, batch, notification, null ID, positional params, extra context, invalid envelope, unknown method, extra params, and invalid preview params rejected |
+| Before setup | 2 | Configuration still unset after negative probes; preview reports not configured |
+| Save, persistence, and reset authorization | 4 | Save and separate read passed; HTTP reset forbidden; configuration preserved afterward |
+| Preview behavior and boundaries | 4 | Exact text, empty text, Unicode boundary, and over-limit rejection passed |
+
+The local demo narrative contained 62 sequential steps, from run start through
+each check's start/result to the passing summary. All records shared the run ID.
+This verifies the supplied local narrative output, not the deployed backend's
+invocation logs or their deployed code version.
+
+### Earlier failure retained
+
+The preceding operator-run attempt, `b2bc1b71-f616-4707-97f8-05f1ba2c7b1d`,
+started at `2026-10-25T16:04:41.582Z` and stopped after approximately 2.69 seconds.
+Local preflight and deployed readiness passed; `config.get unset` failed because
+a prefix was already saved. `configurationMayHaveChanged` was `false` and the
+suite stopped before its write tests. The later passing run establishes that
+its initial unset check passed; it does not independently document the intervening
+reset action or its UI journey.
+
 ## Live acceptance evidence
+
+Statuses below reflect the dated operator-supplied report, not an independent
+assistant execution. Missing evidence remains unverified.
 
 | Check | Status | Evidence / discrepancy |
 | --- | --- | --- |
-| Setup effort and provisioning time | Unmeasured | No approved setup performed |
-| HTTP rejection of absent/invalid credentials | Unverified | Opt-in suite not run live |
-| HTTP malformed/unsupported requests | Unverified | Opt-in suite not run live |
-| HTTP unset configuration and not-configured preview | Unverified | Requires unused installation |
-| HTTP save, separate read-back and preview | Unverified | Requires approved test write |
-| HTTP total and per-call runtimes | Unmeasured | No deployed report |
-| Second installation isolation | Unverified | No second approved installation |
-| UI empty and loading | Unverified | Observe before HTTP saves configuration |
-| UI save and read-back after reload | Unverified | Manual installed-UI journey not run |
-| UI exact preview parity with HTTP/OpenRPC | Unverified | Manual journey not run |
-| UI validation and resolver failure | Unverified | Safe failure injection not approved |
-| Backend logs and browser console free of exposure | Unverified | Not inspected live |
+| Setup effort and provisioning time | Unmeasured | Not measured by the supplied run |
+| HTTP rejection of absent/invalid credentials | Passed, operator-reported | Four authentication rejection checks passed on 2026-10-25 |
+| HTTP malformed/unsupported requests | Passed, operator-reported | HTTP guards and JSON-RPC validation checks passed |
+| HTTP unset configuration and not-configured preview | Passed, operator-reported | Initial/still-unset reads and preview-before-setup passed |
+| HTTP save, separate read-back and preview | Passed, operator-reported | Save, persistence, reset denial/preservation, and preview checks passed |
+| HTTP total and per-call runtimes | Recorded, operator-reported | Suite 10.48 seconds; per-check durations supplied, not isolated server timings |
+| Second installation isolation | Unverified | Report explicitly says `unverified` |
+| UI empty and loading | Unverified | Not established by the HTTP report |
+| UI save and read-back after reload | Unverified | No manual journey evidence attached here |
+| UI exact preview parity with HTTP/OpenRPC | Unverified | Not established by the HTTP report |
+| UI validation and resolver failure | Unverified | No safe failure-injection evidence attached here |
+| Backend logs and browser console free of exposure | Unverified | Neither supplied nor inspected for this run |
 | Authorization model for real API operations | Unverified | POC has no real integration |
 
 Replace unverified entries only with dated observations from the approved target.
@@ -126,10 +184,12 @@ and package license metadata are not security or legal approval.
 ## Decision
 
 **Defer real integration. Retain the HTTP adapter provisionally for evaluation,
-not as an accepted production surface.** Neither deployed HTTP nor installed UI
-has been verified, and authorization for real operations has not been designed.
-There is no evidence yet that HTTP reduces testing friction enough to justify
-its public endpoint, credential provisioning and maintenance cost.
+not as an accepted production surface.** The 2026-10-25 operator report provides
+deployed HTTP verification evidence for this POC. Installed UI, second-installation
+isolation, and deployed backend-log inspection remain unverified in this record;
+authorization for real operations has not been designed. The passing HTTP run
+does not by itself establish that its testing value justifies the public endpoint,
+credential provisioning, and maintenance cost.
 
 Recommend a real integration only after both deployed seams pass, authorization
 is justified separately for each caller and real operation, the dependency
