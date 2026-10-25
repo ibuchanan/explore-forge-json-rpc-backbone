@@ -1,12 +1,13 @@
 # Deployed POC verification and decision record
 
-<!-- cspell:words prosemirror prelint brotlied -->
+<!-- cspell:words prosemirror prelint brotlied devb -->
 
 Originally recorded: 2026-10-24. Implementation baseline: `37bfac0` (Ticket 03).
 Ticket 04 added verification tooling without a live acceptance claim.
 The dated 2026-10-25 evidence records a passing deployed HTTP suite, an installed
 UI walkthrough transcript and deployed backend logs. Detailed visual acceptance,
-isolation, deployment revision and production acceptance remain unverified.
+isolation and production acceptance remain unverified. The operator confirmed
+revision `c989664` on the development Jira installation labeled `devb`.
 
 ## Original target and approval record, 2026-10-24
 
@@ -333,6 +334,34 @@ exact deployment metadata and detailed UI observations. No new live app request,
 reset, retry, deployment, credential change or runtime change was performed by
 the assistant while recording this evidence.
 
+## Ticket 11 metadata confirmation and closeout, 2026-10-25
+
+After the HTTP report and UI/log review, the operator explicitly confirmed the
+deployed source revision and named the tested installation `devb`.
+
+| Field | Confirmed scope |
+| --- | --- |
+| Deployed source | `c9896641581a8f3b60d2e78a719df2baee060481`, operator-confirmed |
+| Target | `devb`, the operator's label for the same development Jira installation used for HTTP and UI checks |
+| Tunnel | No active tunnel, operator-confirmed |
+| App | Manifest app `b4fb5180-6f8a-4652-afdc-56e68ba7adbd` |
+| Live operations | Explicit verifier request; operator performed deployment, Admin UI reset and subsequent runs; no new deployment/upgrade/reset by the assistant |
+| Final demonstrated state | `poc-😀` saved; no restoration or subsequent configuration write claimed |
+
+`devb` is an evidence label, not a hostname or a change to Jira, Forge or
+SecretSpec settings. Source and target confirmation arrived after the runs; this
+record does not claim those metadata were captured before the first invocation
+or independently checked against Forge deployment history. Earlier dated gaps
+remain accurate descriptions of the evidence available at those times.
+
+Ticket 11's bounded re-verification is complete: source and target are identified,
+the 30-check HTTP pass, installed-UI transcript and deployed logs are recorded
+separately, and unavailable checks remain explicitly unverified. This is not a
+full visual UI sign-off or production acceptance. UI save/reload, exact rendered
+preview parity, browser console, second-installation isolation and native
+delivery/retry behavior remain unverified; Forge version and browser were not
+recorded. No additional live run or destructive action is needed for closeout.
+
 ## Live acceptance evidence
 
 Statuses below summarize dated operator reports, the retrieved Loom transcript,
@@ -348,7 +377,7 @@ attempts above retain their original scope; missing evidence remains unverified.
 | HTTP save, separate read-back and preview | Passed, operator-reported | Save, persistence, reset denial/preservation, and preview checks passed |
 | HTTP total and per-call runtimes | Recorded, operator-reported | Historical suite 10.48 seconds; ticket 11 suite 12.393711 seconds, plus selected backend timings |
 | Second installation isolation | Unverified | Report explicitly says `unverified` |
-| Same installation / no tunnel | Confirmed, operator-reported | Operator affirmed development target matches the passing HTTP run; exact identifiers/revision not supplied |
+| Source / installation / no tunnel | Confirmed, operator-reported | Revision `c989664`, development Jira target `devb`, same HTTP/UI installation, no active tunnel |
 | Installed three-screen walkthrough | Supported, operator-reported | Linked Loom transcript narrates refresh, Configure, Get started, configured feedback and preview; frames not inspected |
 | UI read, reset and preview execution | Verified in supplied backend excerpt | Successful UI calls; reset followed by an unset-state read |
 | UI empty and loading | Partially evidenced | Empty backend state after reset verified; loading/empty visual states unverified |
@@ -392,8 +421,10 @@ and package license metadata are not security or legal approval.
 not as an accepted production surface.** The 2026-10-25 operator report provides
 deployed HTTP verification evidence for this POC. Ticket 11 additionally records
 an installed-UI walkthrough transcript and corroborating deployed backend logs.
-Detailed visual UI acceptance, exact deployment identity and second-installation
-isolation remain unverified; authorization for real operations is not designed.
+The operator confirmed revision `c989664` on development target `devb`; Forge
+deployment history was not independently checked. Detailed visual UI acceptance
+and second-installation isolation remain unverified; authorization for real
+operations is not designed.
 The passing HTTP run does not by itself establish that its testing value
 justifies the public endpoint, credential provisioning, and maintenance cost.
 
