@@ -70,6 +70,64 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
     expect(run.status).toBe(0);
     const report = JSON.parse(run.stdout);
     expect(report.status).toBe("failed");
+    expect(report.commandCoverage).toEqual([
+      {
+        command: "config.get",
+        principal: "http-bearer",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.get",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.set",
+        principal: "http-bearer",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.set",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.reset",
+        principal: "http-bearer",
+        expected: "denial",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.reset",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "integration.preview",
+        principal: "http-bearer",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "integration.preview",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+    ]);
     const records = run.stderr
       .trim()
       .split("\n")
@@ -245,6 +303,53 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
     expect(report.isolation).toBe("verified");
     expect(report.ui).toBe("unverified");
     expect(report.configurationMayHaveChanged).toBe(true);
+    expect(
+      report.commandCoverage
+        .filter((entry) => entry.principal === "http-bearer")
+        .map(({ command, expected, successfulExecution, denial }) => [
+          command,
+          expected,
+          successfulExecution,
+          denial,
+        ]),
+    ).toEqual([
+      ["config.get", "success", "verified", "unverified"],
+      ["config.set", "success", "verified", "unverified"],
+      ["config.reset", "denial", "unverified", "verified"],
+      ["integration.preview", "success", "verified", "unverified"],
+    ]);
+    expect(
+      report.commandCoverage.filter((entry) => entry.principal === "ui-admin"),
+    ).toEqual([
+      {
+        command: "config.get",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.set",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "config.reset",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+      {
+        command: "integration.preview",
+        principal: "ui-admin",
+        expected: "success",
+        successfulExecution: "unverified",
+        denial: "unverified",
+      },
+    ]);
     expect(prefixes.get(primary)).toBe("poc-😀");
     expect(prefixes.has(secondary)).toBe(false);
     expect(report.checks.every((check) => check.status === "passed")).toBe(
@@ -369,6 +474,17 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
         status: "failed",
         message: expect.stringContaining(guidance),
       });
+      expect(report.status).toBe("failed");
+      expect(report.commandCoverage).toHaveLength(8);
+      expect(
+        report.commandCoverage.every(
+          (entry) =>
+            entry.successfulExecution === "unverified" &&
+            entry.denial === "unverified",
+        ),
+      ).toBe(true);
+      expect(report.ui).toBe("unverified");
+      expect(report.isolation).toBe("unverified");
       expect(report.configurationMayHaveChanged).toBe(false);
       expect(fetcher).toHaveBeenCalledTimes(1);
       expect(JSON.stringify(report)).not.toContain(secret);
@@ -417,6 +533,13 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
       expect(report.configurationMayHaveChanged).toBe(false);
       expect(fetcher).toHaveBeenCalledTimes(1);
       expect(JSON.stringify(report)).not.toContain("private-");
+      expect(
+        report.commandCoverage.every(
+          (entry) =>
+            entry.successfulExecution === "unverified" &&
+            entry.denial === "unverified",
+        ),
+      ).toBe(true);
     }
   });
 
@@ -497,16 +620,38 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
   });
 
   it("stops before save on negative-case regressions and after an uncertain write", async () => {
-    for (const failingName of ["authorization absent", "config.set save"]) {
-      const { fetcher: adapter } = transport();
+    for (const [failingName, failingMethod, setVerified, denialVerified] of [
+      ["authorization absent", null, "unverified", "unverified"],
+      ["config.set save", "config.set", "unverified", "unverified"],
+      [
+        "config.reset forbidden for HTTP",
+        "config.reset",
+        "verified",
+        "unverified",
+      ],
+      ["preview exact text", "integration.preview", "verified", "verified"],
+    ] as const) {
+      const { fetcher: adapter, prefixes } = transport();
       const fetcher = vi.fn(async (url: string, init: RequestInit) => {
         const payload = String(init.body ?? "");
-        if (
-          (failingName === "authorization absent" &&
-            !new Headers(init.headers).has("authorization")) ||
-          (failingName === "config.set save" &&
-            payload.includes('"prefix":"  poc-😀  "'))
-        ) {
+        const failing =
+          failingMethod === null
+            ? !new Headers(init.headers).has("authorization")
+            : payload.includes(`"method":"${failingMethod}"`) &&
+              (failingMethod !== "integration.preview" ||
+                payload.includes('"id":"preview"'));
+        if (failing) {
+          // A save can persist even though no reply reaches the verifier.
+          if (failingMethod === "config.set") await adapter(url, init);
+          // A well-formed but incorrect reply is not evidence of reset success
+          // or of the expected denial.
+          if (failingMethod === "config.reset") {
+            return Response.json({
+              jsonrpc: "2.0",
+              id: "reset-denied",
+              result: { configured: false },
+            });
+          }
           throw new Error("unsafe raw exception");
         }
         return adapter(url, init);
@@ -515,9 +660,25 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
       expect(report.status).toBe("failed");
       expect(report.checks.at(-1)?.name).toBe(failingName);
       expect(JSON.stringify(report)).not.toContain("unsafe raw exception");
-      expect(report.configurationMayHaveChanged).toBe(
-        failingName === "config.set save",
-      );
+      expect(report.configurationMayHaveChanged).toBe(failingMethod !== null);
+      expect(prefixes.has(primary)).toBe(failingMethod !== null);
+      expect(
+        report.commandCoverage
+          .filter((entry) => entry.principal === "http-bearer")
+          .map(({ command, successfulExecution, denial }) => [
+            command,
+            successfulExecution,
+            denial,
+          ]),
+      ).toEqual([
+        ["config.get", "verified", "unverified"],
+        ["config.set", setVerified, "unverified"],
+        ["config.reset", "unverified", denialVerified],
+        ["integration.preview", "unverified", "unverified"],
+      ]);
+      expect(report.ui).toBe("unverified");
+      expect(report.isolation).toBe("unverified");
+      expect(fetcher.mock.calls).toHaveLength(report.checks.length - 2);
     }
   });
 });

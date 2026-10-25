@@ -77,6 +77,23 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     configurationMayHaveChanged: false,
     isolation: "unverified" as "unverified" | "verified",
     ui: "unverified" as const,
+    commandCoverage: [
+      "config.get",
+      "config.set",
+      "config.reset",
+      "integration.preview",
+    ].flatMap((command) =>
+      (["http-bearer", "ui-admin"] as const).map((principal) => ({
+        command,
+        principal,
+        expected:
+          command === "config.reset" && principal === "http-bearer"
+            ? "denial"
+            : "success",
+        successfulExecution: "unverified" as "unverified" | "verified",
+        denial: "unverified" as "unverified" | "verified",
+      })),
+    ),
     checks: [] as Check[],
   };
   async function check(
@@ -290,6 +307,30 @@ export async function verifyDeployed(env: Environment, send: Transport) {
         },
         () => diagnostic,
       );
+      // Credit only a contract-matching reply for the authenticated principal.
+      // Protocol/parameter errors and not-configured outcomes prove neither
+      // successful execution nor authorization denial.
+      const coverage = report.commandCoverage.find(
+        (entry) =>
+          entry.principal === "http-bearer" &&
+          options.auth === undefined &&
+          body !== null &&
+          typeof body === "object" &&
+          "method" in body &&
+          entry.command === body.method,
+      );
+      if (coverage && received !== null && typeof received === "object") {
+        if ("result" in received) coverage.successfulExecution = "verified";
+        if (
+          "error" in received &&
+          received.error !== null &&
+          typeof received.error === "object" &&
+          "code" in received.error &&
+          received.error.code === -32001
+        ) {
+          coverage.denial = "verified";
+        }
+      }
       return received;
     }
 

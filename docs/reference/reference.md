@@ -159,6 +159,17 @@ not transaction rollback. UI remains unverified; optional isolation checks are
 read-only. HTTP probes reject redirects, time out after 20 seconds, and bound
 responses to 32 KiB. Normal test/check commands never run the live entry point.
 
+`commandCoverage` lists all four commands for the `http-bearer` and `ui-admin`
+execution profiles. Each entry declares `expected` (`success`, except HTTP reset:
+`denial`) and separate `successfulExecution` / `denial` evidence fields
+(`verified` or `unverified`). Evidence is credited only after an authenticated,
+contract-matching response: a result verifies execution; `-32001` verifies denial.
+Other errors, planned probes, and failed checks earn neither. Earlier observations
+survive an early stop, but an uncertain save is not verified execution. HTTP reset
+success and all UI execution remain unverified, even on a passing HTTP run.
+Installed UI rendering, optional isolation, and backend-log inspection are separate
+observations; the local verifier run ID does not establish backend correlation.
+
 SecretSpec resolves target, token, and URL settings. URL upsert trusts nonempty
 cached values; otherwise it obtains/saves the module URL. Local resolution is
 not runtime provisioning. See [development configuration](../../DEVELOPMENT.md)

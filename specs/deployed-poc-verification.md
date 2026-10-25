@@ -142,6 +142,46 @@ suite stopped before its write tests. The later passing run establishes that
 its initial unset check passed; it does not independently document the intervening
 reset action or its UI journey.
 
+## Local command-coverage baseline, 2026-10-25
+
+Command architecture ticket 01 was tested against base revision
+`4fd39fcaf40537ee543b374e9520a71079995e00` plus the ticket's verifier,
+characterization-test, and documentation changes. This is fresh **local** evidence,
+not another deployed run or a renewal of the historical 30-check HTTP pass.
+
+- The unchanged focused baseline passed 51 tests. Two new reporting assertions
+  failed before implementation (missing `commandCoverage`, then missing observed
+  evidence), and passed after their respective changes.
+- The strengthened focused suite passed 52 tests across command, HTTP, resolver,
+  handler, OpenRPC contract, and injected verifier seams. Existing fixtures cover
+  Unicode/trim-before-length, exact preview text, empty state, save/read-back,
+  confirmed UI reset, and fail-closed admin checks. Added assertions pin rejection
+  precedence and reject forged UI authority without reset/write effects.
+- `bun run check` passed: 101 tests in 10 files, typecheck, Biome lint/format,
+  Forge lint through the existing Fence Rider wrapper, prelint, and a compiled
+  bundle of 8.46 kB against 10 kB. Prelint retained its existing script/scope
+  advisories. The first check attempt stopped on documentation table formatting;
+  the corrected run passed.
+- Local verifier fixtures cover full pass, failed preflight/readiness, malformed
+  readiness results, and early stops. A save that persisted before losing its reply
+  earns no successful-execution evidence; no retry or rollback is claimed.
+
+| Command | Authenticated HTTP fixture | UI-admin fixture | Installed/live evidence from this session |
+| --- | --- | --- | --- |
+| `config.get` | Successful execution verified | Successful execution verified through resolver | Unverified |
+| `config.set` | Successful execution verified | Successful execution verified through resolver | Unverified |
+| `config.reset` | Denial verified; positive execution unverified | Confirmed reset verified through resolver | Unverified |
+| `integration.preview` | Successful execution verified | Successful execution verified through resolver | Unverified |
+
+The HTTP verifier's `commandCoverage` never imports the separate resolver-test
+observations: its UI-admin entries remain unverified. A configured-state readiness
+read can verify `config.get` even if the subsequent unset-state check fails;
+failed readiness and unattempted checks earn no evidence. Optional isolation is
+verified only within the injected two-store fixture here. Installed UI rendering,
+real installation isolation, backend-log inspection, native delivery, and all
+changed-revision deployed behavior remain unverified. No live request, deployment,
+provisioning, reset, dependency change, or peer-repository edit was performed.
+
 ## Live acceptance evidence
 
 Statuses below reflect the dated operator-supplied report, not an independent

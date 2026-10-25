@@ -421,6 +421,58 @@ describe("shared JSON-RPC commands", () => {
     });
   });
 
+  it("preserves rejection precedence before any storage effects", async () => {
+    const store = {
+      get: vi.fn(async () => undefined),
+      set: vi.fn(async () => {}),
+      reset: vi.fn(async () => {}),
+    };
+    const denied = { source: "api" as const, authorized: false };
+    for (const [payload, caller, id, code, message] of [
+      ["{", denied, null, -32700, "Parse error"],
+      [
+        { ...request("unknown"), caller: { source: "ui", authorized: true } },
+        denied,
+        1,
+        -32600,
+        "Invalid Request",
+      ],
+      [request("unknown"), denied, 1, -32001, "Forbidden"],
+      [request("config.set", { prefix: 7 }), denied, 1, -32001, "Forbidden"],
+      [
+        request("unknown", { caller: "admin" }),
+        context,
+        1,
+        -32601,
+        "Method not found",
+      ],
+      [request("config.reset", {}), context, 1, -32602, "Invalid params"],
+      [
+        request("config.reset", { confirm: true }),
+        context,
+        1,
+        -32001,
+        "Forbidden",
+      ],
+      [
+        request("integration.preview", {}),
+        context,
+        1,
+        -32602,
+        "Invalid params",
+      ],
+    ] as const) {
+      expect(await dispatch(payload, caller, store)).toEqual({
+        jsonrpc: "2.0",
+        id,
+        error: { code, message },
+      });
+    }
+    expect(store.get).not.toHaveBeenCalled();
+    expect(store.set).not.toHaveBeenCalled();
+    expect(store.reset).not.toHaveBeenCalled();
+  });
+
   it("sanitizes unexpected storage failures without logging exception details", async () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
     const store = {

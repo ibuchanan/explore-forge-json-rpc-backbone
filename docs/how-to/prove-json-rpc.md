@@ -520,6 +520,13 @@ Read these report fields before declaring success:
 | `configurationMayHaveChanged` | True once a save is attempted, even if its reply fails. Not a rollback guarantee. |
 | `isolation`                   | Verified only if the optional second-installation checks pass.                    |
 | `ui`                          | Always unverified; this runner cannot inspect the installed UI.                   |
+| `commandCoverage`             | Expected and observed command/principal execution and denial; details below.      |
+
+Check `commandCoverage` even when `status` is `passed`. HTTP reset denial verifies
+only denial, not reset execution. UI command execution stays unverified in this
+runner; use the Admin UI proof separately. On failure, only already observed,
+contract-matching responses count; neither an attempted save nor an unattempted
+positive path is successful execution.
 
 ## Record evidence and investigate failures
 

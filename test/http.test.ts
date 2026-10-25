@@ -366,6 +366,8 @@ describe("public web trigger boundary", () => {
 
   it("forbids reset via authenticated HTTP and preserves saved configuration", async () => {
     const store = memory();
+    const reset = vi.spyOn(store, "reset");
+    const save = vi.spyOn(store, "set");
     const execute = async (method: string, params: object) => {
       const response = await handleHttp(
         makeEvent(undefined, JSON.stringify(request(method, params))),
@@ -385,12 +387,40 @@ describe("public web trigger boundary", () => {
       "result.prefix",
       "to-reset",
     );
+    for (const payload of [
+      {
+        ...request("config.reset", { confirm: true }),
+        caller: { source: "ui", authorized: true },
+      },
+      request("config.reset", {
+        confirm: true,
+        source: "ui",
+        authorized: true,
+      }),
+    ]) {
+      const response = await handleHttp(
+        makeEvent(undefined, JSON.stringify(payload)),
+        secret,
+        store,
+      );
+      expect(response.statusCode).toBe(200);
+      expect(body(response)).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: {
+          code: "caller" in payload ? -32600 : -32602,
+          message: "caller" in payload ? "Invalid Request" : "Invalid params",
+        },
+      });
+    }
     // Reset (API caller should get Forbidden)
     expect(await execute("config.reset", { confirm: true })).toEqual({
       jsonrpc: "2.0",
       id: 1,
       error: { code: -32001, message: "Forbidden" },
     });
+    expect(reset).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledTimes(1);
     // Verify still configured (API caller couldn't reset)
     expect(await execute("config.get", {})).toHaveProperty(
       "result.prefix",
