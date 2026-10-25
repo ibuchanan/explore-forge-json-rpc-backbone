@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import Ajv from "ajv";
+import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import { dispatch } from "../src/commands";
 
@@ -27,6 +28,7 @@ schema.$schema = "http://json-schema.org/draft-07/schema#";
 schema.definitions.JSONSchema = {};
 schema.definitions.referenceObject.properties.$ref = { type: "string" };
 const ajv = new Ajv({ strict: false });
+addFormats(ajv);
 const validate = ajv.compile(schema);
 
 const caller = { source: "api" as const, authorized: true };
@@ -61,6 +63,28 @@ describe("OpenRPC contract", () => {
           paramStructure === "by-name",
       ),
     ).toBe(true);
+  });
+
+  it("validates URI syntax in OpenRPC metadata", () => {
+    for (const [uri, valid] of [
+      ["https://example.test/terms", true],
+      ["urn:example:terms", true],
+      ["not a URI", false],
+      ["/relative/terms", false],
+    ] as const) {
+      const document = structuredClone(contract);
+      document.info.termsOfService = uri;
+      expect(validate(document), uri).toBe(valid);
+      if (!valid) {
+        expect(validate.errors).toContainEqual(
+          expect.objectContaining({
+            instancePath: "/info/termsOfService",
+            keyword: "format",
+            params: { format: "uri" },
+          }),
+        );
+      }
+    }
   });
 
   it("preview schemas and documented errors match runtime behavior", async () => {

@@ -41,13 +41,13 @@
     "@forge-ahead/errors": "github:ibuchanan/forge-ahead-errors",
     "@forge-ahead/logging": "github:ibuchanan/forge-ahead-logging",
     "@forge-ahead/triggers": "github:ibuchanan/forge-ahead-triggers",
-    "@forge/api": "8.3.0",
-    "@forge/bridge": "7.2.0",
-    "@forge/kvs": "2.1.0",
-    "@forge/react": "12.3.1",
-    "@forge/resolver": "2.0.1",
-    "json-rpc-2.0": "1.8.1",
-    "react": "18.3.1"
+    "@forge/api": "^8.3",
+    "@forge/bridge": "^7.2",
+    "@forge/kvs": "^2.1",
+    "@forge/react": "^12.3",
+    "@forge/resolver": "^2.0",
+    "json-rpc-2.0": "^1.8",
+    "react": "^18.3"
   },
   "devDependencies": {
     "@ast-grep/cli": "^0.51",
@@ -60,6 +60,7 @@
     "@types/react-test-renderer": "18.3.1",
     "@vitest/coverage-v8": "^5.0",
     "ajv": "^8.20",
+    "ajv-formats": "^3.0.1",
     "cspell": "^10.4",
     "fast-check": "^4.10",
     "fence-rider": "github:ibuchanan/ranch-rig-fence-rider",

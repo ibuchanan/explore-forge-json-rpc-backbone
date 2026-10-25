@@ -99,8 +99,7 @@ export async function dispatch(
       ? candidate["id"]
       : null;
   if (
-    !candidate ||
-    candidate["jsonrpc"] !== "2.0" ||
+    candidate?.["jsonrpc"] !== "2.0" ||
     typeof candidate["method"] !== "string" ||
     !candidate["method"] ||
     !Object.hasOwn(candidate, "id") ||
