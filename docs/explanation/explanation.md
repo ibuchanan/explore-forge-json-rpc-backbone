@@ -1,57 +1,125 @@
-# Why commands sit between transports and behavior
+# Why triggers route to commands
 
-This repository explores a command-oriented architecture for a Forge app. In
-this design, a command is a named request for an operation with explicit input
-and a result. It is not a shell command or necessarily a class implementing the
-Gang of Four Command pattern. The `integration.preview` command, for example,
-concatenates a saved prefix and supplied text. A dispatcher interprets a request,
-validates its input, selects the command, and returns a serializable result or
-error. That dispatcher is the shared seam; it is not another public endpoint.
+A trigger explains why execution starts. A command describes the requested
+application operation. An adapter translates the incoming invocation and the
+outgoing outcome. Keeping these ideas distinct lets different Forge entry points
+share behavior without pretending they share identity or completion semantics.
 
-The manifest wires a UI Kit Jira admin page through a Forge resolver and an
-authenticated web trigger to that seam. Both use the same KVS adapter. Local
-tests exercise both paths; the [proof-of-concept spec](../../specs/spec.md)
-still requires separate deployed HTTP and installed-UI evidence.
+Here, Command includes reads such as `config.get`, not only state-changing
+requests. It is neither a shell command nor a requirement to implement a class
+hierarchy. The [glossary](../../GLOSSARY.md) defines the shared vocabulary.
 
-## Why put a command in the middle?
+## What the app already demonstrates
 
-Forge entry points have different shapes. A UI Kit page calls a backend
-resolver through Forge Bridge, while an external client would call a web
-trigger over HTTP. If each adapter contains its own operation logic, the same
-behavior can drift across entry points and can only be tested through those
-platform surfaces. The proposed command seam lets each adapter translate its
-input into the same request; the dispatcher then applies the shared validation,
-method lookup, source policy, and error mapping. A local test could exercise
-that seam without a browser or deployed HTTP endpoint.
+Three UI Kit Jira admin screens call one Bridge resolver. An external operator
+calls an authenticated web trigger. Both paths reach the same JSON-RPC dispatcher
+and installation-scoped KVS adapter. Saving a non-secret prefix, reading it back,
+and previewing its concatenation with supplied text provides an observable
+configuration prerequisite without claiming a third-party integration.
 
-The separation is about _behavior_, not identity. A resolver can derive an
-Atlassian user from server-side Forge context. A web trigger is a public URL
-with no Atlassian user attached; an authenticated external client would be a
-different actor. The adapters must establish identity from trusted inputs and
-reject unauthorized requests before dispatch. A common request shape must not
-turn an external token into a Jira user's permissions. If a later command uses
-product APIs, its authorization must be designed for each caller and operation;
-`asApp()` alone does not check an end user's permissions.
+This implemented seam prevents separate UI and HTTP implementations of the same
+operation. Fast local tests exercise it without a browser or server. Separate
+HTTP invocations can then test actual deployed persistence and authentication.
+An operator-reported 30-check HTTP run passed in approximately 10.48 seconds;
+that is an observation, not a general performance or reliability guarantee.
+The [V&V record](../../specs/deployed-poc-verification.md) retains its limits.
 
-## Why a JSON-RPC-shaped envelope?
+## Shared behavior does not mean shared authority
 
-A method name, object parameters, and a request ID give the proposed command
-seam a compact, transport-neutral vocabulary. The same result or error shape
-can be observed through a resolver or a web trigger, making comparison
-possible. JSON-RPC is a wire-format choice here, not the command pattern
-itself. The POC deliberately proposes only single requests with required IDs;
-it does not promise full JSON-RPC 2.0 support for batches, notifications, or
-positional parameters. The earlier
-[architectural exploration](../../specs/Architectural%20Exploration_%20Command-Oriented%20JSON-RPC%20Engine%20for%20Atlassian%20Forge.md)
-is a broader hypothesis, not an implemented contract or a safe authorization
-template.
+The resolver derives identity from server-side Forge context and verifies Jira
+admin permission using an as-user call. The public web-trigger URL has no such
+identity; it checks a separately provisioned bearer credential. Neither claimed
+request fields nor a logged source name can turn that token into a Jira admin.
 
-## What the separation does not buy
+`config.reset` makes this distinction concrete. Both paths recognize the command,
+but HTTP is forbidden even with a valid credential. The UI requires admin
+authorization and explicit confirmation. Shared registration is not universal
+execution permission, and a successful denial test does not prove the successful
+reset path. No wildcard permission template is justified by a common envelope.
 
-Local tests can show that one command behaves consistently for chosen inputs;
-they cannot prove that manifest wiring, Forge Bridge, HTTP authentication, or
-an installed UI works. Those still need deployed checks. Two adapters also
-cost more to secure and maintain than one. The POC uses two configuration
-commands and a deterministic preview to assess whether the seam earns that
-cost before adding product API operations, a registry generator, or a CLI. If it
-does not, a resolver-only command module is simpler.
+## JSON-RPC as the common integration-testing surface
+
+The useful objective is not that every trigger invokes every command. Native
+triggers need deliberate bindings: an event, rule, or schedule selects an
+operation appropriate to its purpose. A common JSON-RPC test surface instead
+makes the command catalog addressable by stable names and documented parameters.
+Application policy still decides whether an endpoint principal may execute.
+
+This gives a reusable place to test validation, authorization, real storage,
+side-effect preservation, and command sequences across Forge apps. OpenRPC
+captures the catalog and successful result/error contracts. It does not grant
+permissions or prove a principal can exercise every positive path.
+
+The current app supports only a single-call JSON-RPC profile, with required IDs
+and named parameters. Batches, notifications, positional parameters, and null IDs
+are deliberately rejected. A JSON-RPC ID correlates responses; it is not an
+idempotency key or a background-job completion mechanism.
+
+## Why the next extraction separates outcomes from envelopes
+
+Today, handlers throw JSON-RPC-specific exceptions, the dispatcher returns RPC
+envelopes, and types/validation are handwritten. That works for the two existing
+adapters because both use those envelopes. It does not yet prove a
+protocol-neutral command library or actual reuse of trigger-library plumbing:
+`@forge-ahead/triggers` is declared but not imported by runtime source.
+
+The proposed next step is smaller than a new event framework: let a handler
+return an application `Result`, let a common executor enforce validation and
+policy, and let an adapter choose the representation. JSON-RPC remains a
+first-class supported adapter rather than becoming an incidental example.
+The [main spec](../../specs/spec.md) describes this future work; it is not current
+runtime behavior.
+
+Native completion is the important variation. An HTTP caller needs a response;
+a UI needs serializable data; an async consumer needs acknowledgement or a native
+retry request. Returning a JSON-RPC error or an ordinary `Result` failure may
+still complete a consumer invocation successfully. Command failure and delivery
+failure therefore cannot be collapsed into the same return object.
+
+Likewise, a transient failure is not sufficient evidence that repeating a write
+is safe. A write can persist before its reply is lost. Outcome mapping must keep
+uncertainty, repeat safety, and native retry policy distinct; no universal retry
+rule follows from an HTTP status or RPC error code.
+
+## Why OpenRPC is useful without generating business policy
+
+A contract-first catalog can reduce drift between handlers, clients, schemas,
+and tests. The current contract tests already validate the OpenRPC document and
+compare examples and successful outputs with execution. They do not currently
+generate implementation types or drive runtime parameter validation.
+
+The planned generation experiment targets types, handler maps, names, validators,
+and call helpers. Implementations and authorization stay handwritten. Prefix
+normalization illustrates the limit: length is validated after trimming, so
+blind validation of raw input can change behavior despite matching a schema.
+Generated types cannot enforce runtime length or resource authorization.
+
+The outbound [commands seed spec](../../specs/outbound/forge-ahead-commands.md)
+keeps the proposed executor/JSON-RPC tooling separate from the
+[trigger handoff](../../specs/outbound/forge-ahead-triggers.md), which owns native
+completion and adaptation. The separation is a proposal to test locally first,
+not a claim that either library already implements it.
+
+## What remains outside command integration coverage
+
+A passing HTTP suite does not establish event delivery, action input mapping,
+resolver identity lookup in a live installation, retry scheduling, UI rendering,
+or backend/browser log secrecy. Local adapter tests and selected native journeys
+still matter. The installed UI and second-installation isolation remain unverified
+in the recorded live evidence, even though relevant local tests exist.
+
+Observability helps explain these distinctions. The app records safe RPC
+invocation/outcome facts and numbered demo narratives, while the verifier names
+each assertion separately. An expected negative test can produce a rejection log
+and a passing check. A save-completed log is not its later read-back assertion.
+The current local run ID is not propagated into backend records.
+
+## What was not carried forward from the original exploration
+
+The original proposal suggested full JSON-RPC support, inherited wildcard
+permissions, generated CLI tooling, and broad speed/reliability gains. None of
+those is an implemented or established property of this POC. This explanation
+retains the useful rationale while the [runtime reference](../reference/reference.md)
+records what exists and the main spec owns the bounded next experiments.
+No persistent server, assumed user identity, automatic rollback, or general
+production-integration promise follows from the successful demonstration.

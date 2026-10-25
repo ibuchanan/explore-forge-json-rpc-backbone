@@ -286,7 +286,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution process.
 - `.atlassian/`: Repository ownership metadata.
 - `src/`: TypeScript source code.
 - `docs/`: Diataxis guides, reference, explanations, and tutorials.
-- `specs/`: Specifications and reference material; excluded from Biome checks.
+- `specs/spec.md`: The single main spec for this repo's remaining proof work.
+- `specs/outbound/`: Draft handoffs for the trigger and proposed command libraries.
+- Other `specs/` records: Dated V&V evidence, not competing implementation plans.
+  Specs are excluded from Biome checks; validate their Markdown separately.
+- `GLOSSARY.md`: Shared command, trigger, outcome, and adapter vocabulary.
 - `dist/`: Build output; ignored by Git and excluded from Biome checks.
 - `scripts/`: SecretSpec-backed web-trigger URL upsert and deployed-test setup.
 - `test/`: Forge app tests (Vitest), isolated script checks, and the opt-in

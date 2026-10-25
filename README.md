@@ -22,7 +22,9 @@ Jira `ADMINISTER` permission on every call; HTTP uses a separately provisioned
 bearer secret. Preview only concatenates the saved prefix and supplied text.
 Configure also offers a confirmed, admin-only `config.reset` command to remove
 that prefix for repeat verification; HTTP callers cannot reset configuration.
-Local tests pass; deployed HTTP and installed-UI acceptance remain unverified.
+Local tests pass. An operator-reported deployed HTTP run passed all 30 checks
+in approximately 10.48 seconds; installed UI, isolation, and backend-log
+acceptance remain unverified in the [evidence record](specs/deployed-poc-verification.md).
 This is a proof of concept, not production-ready integration software.
 
 ## Try the repository locally
@@ -45,7 +47,8 @@ register a new app identity just to inspect this checkout.
 
 ## Next verification
 
-The [POC spec](specs/spec.md) requires local **and** deployed UI/HTTP evidence.
+The [main spec](specs/spec.md) plans the next command-layer and adapter proofs;
+it does not replace separate local, deployed HTTP, and installed-UI evidence.
 [Prove it from the Admin UI](docs/how-to/prove-admin-ui.md) covers save, reload,
 preview, and error checks, with a UI-to-resolver-to-command execution trace.
 [Prove it via JSON-RPC](docs/how-to/prove-json-rpc.md) covers HTTP requests and
@@ -60,10 +63,16 @@ not yet grant it. Do not infer live acceptance from local mocks.
 
 ## Read more
 
-- [Why commands sit between transports and behavior](docs/explanation/explanation.md)
-  — architectural rationale and trade-offs.
-- [POC spec](specs/spec.md) — proposed scope, contract, security, and test
-  criteria.
+- [Follow a command through local tests](docs/tutorials/tutorial.md) — a guided,
+  credential-free walkthrough of the implemented paths.
+- [Why triggers route to commands](docs/explanation/explanation.md)
+  — current architecture, rationale, and the limits of the proof.
+- [Runtime reference](docs/reference/reference.md) — command, protocol,
+  authorization, storage, and logging facts.
+- [Main spec](specs/spec.md) — this repo's remaining proof work and test criteria.
+- [Trigger-library handoff](specs/outbound/forge-ahead-triggers.md) and
+  [Commands-library seed](specs/outbound/forge-ahead-commands.md) — outbound drafts,
+  not implemented package capabilities.
 - [Forge app configuration](DEVELOPMENT.md#configure-this-repositorys-variables)
   — this app's requirements and links to shared SecretSpec and Fence Rider docs.
 - [Development](DEVELOPMENT.md) — checks and repository layout.

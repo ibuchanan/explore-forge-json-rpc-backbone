@@ -170,6 +170,15 @@ wall-clock durations. Do not include bearer credentials, full trigger URLs,
 raw response bodies, or sensitive logs. Record failures and discrepancies even
 when later attempts pass; a missing check is not a pass.
 
+## Relationship to current documentation
+
+This is a dated V&V and decision record, not the current implementation spec.
+The [runtime reference](../docs/reference/reference.md) describes implemented
+behavior, the [explanation](../docs/explanation/explanation.md) captures the
+architectural rationale, and the [main spec](spec.md) owns remaining proof work.
+Historical test counts and earlier deployment decisions below are retained as
+evidence; they do not override current source or prove later revisions.
+
 ## Release caveats
 
 Ticket 03 recorded a dependency audit with 8 high and 4 low entries, including

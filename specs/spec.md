@@ -1,235 +1,204 @@
-# POC: shared commands for a Forge configuration lifecycle
+# Prove a reusable trigger-to-command architecture
 
-<!-- cspell:words webtrigger unconfigured pocock -->
+<!-- cspell:words pocock -->
 
-Status: draft for review. This spec narrows the hypothesis in
-[Architectural Exploration: Command-Oriented JSON-RPC Engine for Atlassian
-Forge](Architectural%20Exploration_%20Command-Oriented%20JSON-RPC%20Engine%20for%20Atlassian%20Forge.md).
-It does not establish production suitability.
+Status: draft for review, 2026-10-25. Audience: maintainers of
+`explore-forge-json-rpc-backbone`. This is the **only main implementation spec
+for this repository**. It replaces the original POC plan and architectural
+exploration; implemented behavior is documented in the reference and guides.
+It does not authorize live operations or claim production readiness.
 
 ## Problem Statement
 
-As a developer testing an integration Forge app, I can deploy and install it,
-but an additional configuration step may be needed before an integrated flow
-works. Today I must perform that step manually or drive a browser. I want to
-exercise the same configuration and integration commands directly in fast tests
-and through the deployed app, without writing a separate test-only backdoor or
-duplicating behavior in the UI and HTTP handler. The linked
-[configuration-lifecycle exploration][config-lifecycle] motivates the problem;
-its exact implementation was not available for verification when drafting this
-spec.
+The app has demonstrated a shared configuration lifecycle through a Jira UI
+resolver and an authenticated JSON-RPC web trigger. An operator-reported run
+passed all 30 deployed HTTP checks. However, the current dispatcher combines
+application execution with JSON-RPC errors and envelopes. Types, method names,
+validation, and OpenRPC descriptions still have overlapping handwritten forms.
+
+We want to learn whether commands can become a reusable application interface
+across Forge apps, with JSON-RPC as a standard deployed integration-testing
+surface. We must preserve the proven behavior without assuming that every
+trigger can execute every command, or that every actor has the same authority.
+Native result and retry translation remain the important unproven dimension.
 
 ## Solution
 
-Extend this existing Forge app with a small, shared command dispatcher. A Jira
-admin can run its commands from a UI Kit page through a resolver, while an
-authenticated external client can call the **same set of commands** through a
-JSON-RPC webtrigger. The POC uses a non-secret configuration value and a
-local, deterministic integration preview: save a prefix, read it back, and
-preview the output for supplied text. This demonstrates a real persisted
-configuration prerequisite without pretending that a mocked external API
-proves integration with a third-party service.
+Use this app as the reference consumer for a small, protocol-neutral command
+executor and a first-class JSON-RPC adapter. Generate contract types from the
+existing OpenRPC description, preserve the current wire contract, and prove
+explicit application-outcome mappings before extracting reusable libraries.
 
-Test at two seams: invoke the dispatcher directly for fast command tests, and
-send authenticated requests to the **deployed HTTP webtrigger** for integration
-tests. Also verify the installed UI manually against the same command results.
-Publish the wire contract as an OpenRPC document. Customer-facing use of this
-endpoint is a possible later application, not a production promise of this POC.
+Every registered command must be addressable through the JSON-RPC test surface,
+subject to explicit authorization. Addressability is not successful execution:
+HTTP denial of `config.reset` remains a valid coverage case, not positive-path
+reset coverage. No adapter may impersonate a UI administrator to obtain parity.
+
+Use the existing direct-execution and deployed-JSON-RPC seams. Add focused
+native-adapter contract tests only where they establish different output or
+retry behavior. Native Forge wiring and installed UI checks remain separate
+from command integration coverage.
 
 ## User Stories
 
-1. As an app developer, I want to call each command at a local dispatcher seam,
-   so that command behavior can be checked without deploying or opening Jira.
-2. As an app developer, I want a persistent, per-installation configuration
-   prerequisite, so that tests can exercise the state transition after install.
-3. As an app developer, I want the preview to fail clearly before configuration,
-   so that an unconfigured installation cannot silently appear ready.
-4. As an app developer, I want to save a non-secret prefix and read it back,
-   so that I can confirm setup survived a separate Forge invocation.
-5. As an app developer, I want to preview an output using saved configuration,
-   so that I can check the configured path end to end without external egress.
-6. As an app developer, I want the resolver and webtrigger to use the same
-   command set, so that neither adapter silently diverges.
-7. As a Jira admin, I want to inspect configuration status and run setup and
-   preview commands from a UI Kit page, so that I can drive the POC manually.
-8. As a Jira admin, I want empty, loading, success, and actionable error states,
-   so that I can tell whether setup or a command failed.
-9. As an API operator, I want an OpenRPC description and request IDs, so that
-   I can create valid requests and correlate results with calls.
-10. As an API operator, I want missing or invalid credentials rejected before
-    commands execute, so that possession of the public URL is not enough.
-11. As an API operator, I want predictable errors for malformed requests,
-    unknown commands, invalid parameters, and unconfigured state, so that
-    failures are diagnosable without exposing internal exception details.
-12. As an app developer, I want transport identity derived from trusted
-    server-side inputs, so that request parameters cannot impersonate a user.
-13. As an app developer, I want a deployed HTTP test to save, read, and use
-    configuration in separate calls, so that local mocks cannot hide broken
-    storage, authentication, or manifest wiring.
-14. As a maintainer, I want recorded HTTP and UI observations and a decision
-    gate, so that I can decide whether to add a real integration next.
+1. As an app maintainer, I want a preserved baseline contract, so that extracting
+   the command layer does not change existing callers' behavior.
+2. As a command author, I want protocol-neutral outcomes, so that handlers do
+   not construct HTTP responses or JSON-RPC exceptions.
+3. As a test author, I want every registered command represented in OpenRPC,
+   so that the common integration surface has a complete catalog.
+4. As a test operator, I want expected authorization denials recorded separately
+   from successful execution, so that coverage does not overstate evidence.
+5. As a Jira admin, I want reset to retain its existing authorization rule,
+   so that a testing refactor does not expand destructive access.
+6. As a maintainer, I want trusted caller context outside command parameters,
+   so that client input cannot manufacture permissions or dependencies.
+7. As a developer, I want generated parameter and result types, so that method
+   changes cannot silently leave the frontend and handlers inconsistent.
+8. As a developer, I want named parameter objects and stable dotted method
+   names, so that generation preserves the current OpenRPC contract.
+9. As a maintainer, I want normalization tested before validation, so that a
+   generator does not change prefix trimming or Unicode length behavior.
+10. As a developer, I want invalid outputs detected as internal failures,
+    so that handler defects cannot escape as apparently valid results.
+11. As a trigger adapter author, I want explicit success, terminal failure,
+    retryable failure, and uncertain-write cases, so that native completion
+    semantics are tested rather than guessed.
+12. As an operator, I want no automatic retry after an uncertain write,
+    so that a lost reply does not cause duplicate side effects.
+13. As a maintainer, I want real use of compatible trigger-library helpers,
+    so that declaring the dependency becomes an evidence-backed integration.
+14. As a library author, I want consumer evidence before extraction,
+    so that shared packages capture repeated behavior rather than speculation.
+15. As a reviewer, I want installed UI, isolation, and backend-log observations
+    distinguished from HTTP evidence, so that missing checks stay unverified.
+16. As an operator, I want the existing SecretSpec workflow and sanitized
+    narratives preserved, so that verification remains repeatable and safe.
+17. As a maintainer, I want a bounded second-consumer experiment,
+    so that cross-app reuse can be assessed without building another framework.
+18. As a reviewer, I want an explicit extraction decision and unresolved risks,
+    so that successful tests do not become an unsupported production promise.
 
 ## Implementation Decisions
 
-- **One shared command surface.** Use `json-rpc-2.0` as the proposed runtime
-  server/dispatcher, not a long-lived HTTP server. Register the three methods
-  once. Both adapters pass a validated single-request envelope and a trusted,
-  server-constructed caller context to the same server; methods authorize
-  against that context, never against client-supplied params. The HTTP adapter
-  authenticates before calling it; the UI resolver verifies admin eligibility
-  before calling it. Configuration storage is injected at the command boundary
-  in local tests; the deployed app uses Forge KVS. Do not create a registry
-  generator, test-only endpoint, or separate UI command implementation.
-- **Small command set.** `config.set` takes `{ prefix: string }`, a
-  non-secret string trimmed before validation and persistence; the trimmed
-  value must be nonempty and at most 64 Unicode code points. It returns
-  `{ configured: true }` after persisting it. `config.get` takes `{}` and
-  returns `{ configured: boolean, prefix: string | null }`. `integration.preview`
-  takes `{ text: string }`, up to 2,000 Unicode code points including empty,
-  and returns `{ output: string }`, with `output` equal to the saved prefix
-  concatenated with `text`. Before setup it returns a documented application
-  error, not a default prefix. Reject extraneous parameters on all methods.
-  The preview is a local stand-in, not an outbound integration or Jira API call.
-- **Configuration isolation.** Save only the prefix in Forge KVS, scoped to
-  the app installation; do not persist request credentials, output text, or
-  a process-local cache. Separate invocations and installations must observe
-  the appropriate stored value. `config.set` is the only state-changing
-  command. Keep test installations and data distinct from any live customer
-  installation; no automated cleanup against a real site without approval.
-- **Protocol and OpenRPC.** Document the three methods, object parameters,
-  result shapes, error codes, and a bearer security scheme in an OpenRPC
-  artifact. The common envelope requires `jsonrpc: "2.0"`, a nonempty method
-  string, object `params`, and a string or finite-number `id`; no null or
-  missing ID. An unknown well-formed method returns `-32601`.
-  Responses contain the same valid ID and exactly one of `result` or `error`;
-  invalid IDs use `null`. Use standard JSON-RPC error codes `-32700` (parse),
-  `-32600` (request), `-32601` (method), `-32602` (params), and `-32603`
-  (internal), plus distinct documented application codes for forbidden and
-  unconfigured. Never return stack traces or raw exception messages. This
-  explicitly supports a **single-call JSON-RPC 2.0 subset**, not batches,
-  notifications, positional params, or nullable IDs. `json-rpc-2.0` supports
-  more of JSON-RPC than this POC: have both adapters call one shared envelope
-  preflight that rejects unsupported forms before handing requests to the
-  library, rather than depending on its default batch/notification behavior.
-  Validate method params at the shared command boundary; the library does not
-  authenticate callers or validate params against OpenRPC. Keep the document
-  and runtime behavior in agreement through contract tests. Lint the document
-  as a development check, not a second dispatch implementation.
-- **UI transport.** Add one Jira admin page rendered with Forge UI Kit. It
-  calls one resolver method through Forge Bridge with the same RPC request
-  object; the resolver builds trusted context from Forge's server-side request
-  and returns responses as data, including sanitized errors. The page shows
-  configuration status, a prefix form with Save, and a text preview with Run.
-  Initial/empty state explains setup; pending state blocks duplicate saves;
-  success shows saved status or preview output; failure shows an actionable
-  message. Never render the bearer secret. The admin-page location alone is
-  not an authorization check: verify Jira admin eligibility server-side for
-  all three UI commands (including preview, which reveals the prefix), and
-  fail closed if it cannot be verified. Final UI details should be approved
-  before UI code.
-- **HTTP transport.** Replace the two demo webtriggers with one v2 dynamic
-  response webtrigger. Accept POST with JSON only; bound body size below Forge
-  limits, parse once, authenticate before dispatch, and return JSON-RPC bodies
-  for authenticated protocol or command outcomes. Return suitable HTTP
-  statuses and small non-RPC bodies for wrong verb, media type, oversized
-  body, or missing/invalid credentials; do not echo secrets. No CORS or
-  browser-to-webtrigger access is needed for this POC.
-- **Identity and authorization.** A public webtrigger URL has no Atlassian
-  user identity. Authenticate one POC external client using an
-  environment-specific bearer secret provided as a Forge runtime variable,
-  never in source, storage responses, or logs. Fail closed if unconfigured;
-  reject missing, duplicate, malformed, and invalid headers before commands
-  run; compare valid-shape secrets in constant time. This credential grants
-  the three POC commands only, including `config.set`; treat it as powerful
-  and distribute only to approved test operators. UI context identifies a
-  Jira user, not a browser-supplied account ID. Authorization is checked for
-  each method in the shared dispatch path using trusted context, with the
-  resolver performing any needed platform permission lookup; neither path
-  invents wildcard permissions or maps the external token to a Jira user.
-  The commands themselves make no product API calls; a server-side admin
-  permission lookup at the resolver boundary is a separate authorization step.
-- **Forge wiring.** Reuse this app identity and Node 24 ESM setup. Wire the
-  admin page resource, resolver, webtrigger, and KVS scope in the manifest and
-  add only necessary dependencies. Configure the encrypted bearer credential
-  as a per-environment Forge runtime variable using the repository's existing
-  variable workflow, not a manifest build-time variable. Where the admin
-  check uses a Jira REST API, look up the exact scopes before implementation.
-  Do not register a new app or deploy as part of this spec.
+- **Preserve the implemented baseline.** Retain four named methods, exact
+  results/errors, the single-call protocol profile, trusted-context rules,
+  source-based reset denial, and storage semantics. Runtime improvements must
+  not silently change authentication, error precedence, supported envelopes,
+  or the distinction between write completion and read-back verification.
+- **Separate execution from representation.** Extract handlers and an executor
+  that return the existing shared `Result` abstraction with semantic failures.
+  JSON-RPC framing and numeric code translation belong to an adapter. Storage
+  stays injected; the command core must not depend on Forge request objects.
+- **Keep authorization explicit.** Adapters establish trusted context; the
+  application defines per-operation policy. Preserve current reset behavior
+  while evaluating a more expressive context than a source and boolean.
+  Do not manufacture identities, wildcard permissions, or a privileged test mode.
+- **Keep JSON-RPC first-class.** The registry and OpenRPC method set must agree.
+  A test execution profile records permitted success, expected denial, and
+  unavailable positive paths for each command/principal. It is application
+  policy, not an authority grant inferred from schema presence. Record the
+  declared expectation and observed coverage per command/principal: successful
+  execution verified, denial verified, or positive path unverified. Do not label
+  a denial-only command fully exercised.
+- **Experiment with generation before selecting tooling.** Evaluate
+  `@open-rpc/typings` against the current document. Adapt its output to named
+  objects, trusted context, and `Result`, or use a small document traversal
+  with `json-schema-to-typescript` if that is simpler and more reliable.
+  Produce a written comparison and compile generated output before choosing.
+- **Own generated artifacts deliberately.** Regenerate types, command names,
+  and handler-map contracts deterministically. Keep implementation bodies and
+  authorization handwritten. Generated stubs must fail explicitly until
+  implemented, never return examples as working business behavior.
+- **Preserve validation semantics.** Prefix length is checked after trimming;
+  preview text is preserved exactly. Reject unknown parameter fields. Resolve
+  references and handle empty objects, literal booleans, nullable results,
+  dotted names, and naming collisions. Types alone do not enforce these rules.
+  Validate result shapes without claiming rollback if validation fails after
+  a side effect. Unsupported schema features must fail generation clearly.
+- **Prove outbound translation locally first.** Add contract fixtures showing
+  the same application outcome mapped to JSON-RPC and a delivery-oriented
+  adapter. The latter is not a deployed consumer until approved manifest
+  wiring and native verification exist. Map retry requests explicitly and
+  consider idempotency before repeating work; JSON-RPC IDs are not deduplication.
+- **Integrate the trigger package by evidence.** Reuse compatible contracts or
+  response helpers in this app when they preserve its behavior. Do not replace
+  authentication or JSON-RPC error sanitization with a generic helper that
+  changes status codes, messages, or exposure. Track unmet library needs in
+  the outbound trigger spec instead of inventing duplicate private frameworks.
+- **Retain operational controls.** SecretSpec supplies targets, credential,
+  and URLs; cached URLs remain operator-reviewed. Keep explicit live invocation,
+  fresh-state requirements, no automatic reset/restoration, and no hidden
+  deployment/provisioning. Keep command outcome and adapter completion distinct
+  in safe logs; do not claim local and backend IDs are already correlated.
+- **Stage adoption.** First prove contract generation and local extraction;
+  then outcome mapping; then consume compatible library releases. A second
+  Forge app or native trigger is a later, bounded experiment with its own policy
+  and approval, not a prerequisite to every local iteration.
 
 ## Testing Decisions
 
-- Test externally observable behavior, not private helpers or internal data
-  structures. The two main seams are (1) direct dispatcher invocation with
-  trusted contexts and a test storage adapter, and (2) JSON-RPC over the
-  deployed HTTP webtrigger. The repository has a configured Vitest runner but
-  no existing behavior tests; use it for local checks.
-- At the dispatcher seam, cover all three commands in sequence, pre-setup
-  failure, repeated set, empty text, Unicode length boundaries, invalid and
-  extra parameters, unknown method, invalid IDs/envelopes, batches,
-  notifications, positional params, denial by source policy, and sanitized
-  internal failures. Assert unsupported forms never invoke a registered
-  method, even though `json-rpc-2.0` accepts them by default. Verify UI and
-  API contexts have the same allowed POC command set but cannot override
-  trusted actor/source with request fields. Check the OpenRPC method names,
-  parameter/result shapes, and error examples against the runtime contract.
-- At adapter boundaries, check wrong verb, media type, oversize, malformed
-  JSON, and missing/duplicate/invalid credentials; assert no command runs on
-  rejected requests. Check resolver failure is returned as data. Never put
-  credentials into fixtures, snapshots, or diagnostic output.
-- With separate approval for deployment/installation on a **development**
-  Jira site, run an opt-in HTTP suite against the actual webtrigger: negative
-  auth and protocol cases; then `config.get` (unset), preview (unconfigured),
-  `config.set`, `config.get`, and preview in separate HTTP invocations. Confirm
-  the persisted value and exact output; verify a second installation if
-  available. Keep this suite out of ordinary `npm run test` and do not run it
-  against a customer's installation by default.
-- Verify the installed UI as a separate manual journey: unconfigured state,
-  save, read-back after reload, successful preview, validation and resolver
-  failure. Compare method results and error codes against the same OpenRPC
-  examples and local fixtures. A passing local suite or HTTP suite does not
-  prove the UI works; a mock API does not prove an external integration works.
-- Success means local checks pass, authenticated deployed HTTP reads back the
-  saved setting and uses it in the next call, unauthorized HTTP requests never
-  dispatch, the UI produces matching results, and no secret, stack, or
-  untrusted identity escapes into output or logs. Record setup time, test
-  runtime, and failures as observations rather than promised speed gains.
-  Before implementation is done run `npm run check`, `npm run typecheck`,
-  `npm run test`, and after manifest changes `npm run lint:forge`.
+- Prefer observable behavior at the existing direct dispatcher/executor seam
+  and the deployed HTTP seam. Prior art includes generated command sequences,
+  Unicode cases, OpenRPC example/result checks, resolver authorization tests,
+  HTTP rejection tests, and the local-adapter version of the deployed verifier.
+- Keep baseline requests and exact response/error fixtures passing across
+  extraction. Preserve rejection-before-side-effect behavior and unknown-field
+  rejection, including client attempts to supply trusted context.
+- Typecheck generated handlers and clients; test deterministic regeneration,
+  missing/extra handler detection, dotted-name preservation, collision failure,
+  resolved references, empty parameters, literal results, and nullability.
+  A clean generation check must detect drift without rewriting manual handlers.
+  The tooling experiment is the first gate: record compile/sample results and
+  choose or reject a generator before treating generated-artifact checks as done.
+- Test normalization and runtime validation separately from static types.
+  Include padded prefixes whose raw length exceeds the normalized limit,
+  Unicode boundaries, invalid outputs, and side effects followed by failure.
+- For one outcome-mapping contract, cover success, permanent denial, transient
+  failure, and unknown write outcome. A returned error object must not silently
+  count as a native retry. Scheduling and product-event return contracts need
+  current documentation and evidence, not an assumed universal `void` result.
+- Preserve privacy and overlapping-invocation logging tests. No raw context,
+  input, output, credential, URL, or exception details may be logged by default.
+- Keep live writes out of normal checks. With separate operator approval,
+  rerun the existing deployed suite after runtime changes and record revision,
+  target metadata, timing, and differences. Retain the dated 30-check pass as
+  historical evidence, not proof of a later implementation.
+- Record installed UI, second-installation isolation, and backend-log inspection
+  separately when available. No HTTP pass or local consumer fixture proves
+  native delivery, UI rendering, retry scheduling, or real external integration.
+- Completion of the next proof requires preserved baseline behavior,
+  reproducible generated contracts, demonstrated outcome mappings, and a
+  written keep/change/defer decision for library extraction. Unavailable live
+  evidence remains explicitly unverified rather than blocking honest local findings.
 
 ## Out of Scope
 
-- Real external service configuration, credentials, egress, data transfer, or
-  Jira product API reads/writes; the local preview cannot prove those flows.
-- Full JSON-RPC conformance, batch calls, notifications, generated CLI/SDK,
-  dynamic registry, multi-client auth, rotation/revocation, and production SLOs.
-- Registering, deploying, installing, upgrading, or modifying a live site as
-  part of writing this specification. Those are separate approved operations.
+- Implementing either outbound library merely by writing these specifications.
+- Making every command executable by every trigger or every authenticated actor.
+- Adding a universal superuser credential, automatic reset, rollback, or retry.
+- Full JSON-RPC conformance, notifications, batches, streaming, generated CLI,
+  runtime schema discovery, or automatic native-module/manifest generation.
+- Real Jira writes, external-service integration, new scopes, app registration,
+  deployment, installation, upgrade, or production acceptance without approval.
+- An event bus, workflow engine, global dependency container, or durable job system
+  before a concrete consumer requires it.
 
 ## Further Notes
 
-- The architecture note is a hypothesis: do not copy its
-  `permissions: ['*']` or `userId: 'anonymous'` examples as authorization
-  decisions. `issue.addComment` and fire-and-forget notifications are future
-  work.
-- Current source is Forge-create demo output: two unauthenticated webtriggers
-  return hello-world content and random request IDs; there is no UI, storage,
-  dispatcher, or JSON-RPC implementation. Change this app, not its identity.
-- **Decision gate:** add a real integration only if both test seams work,
-  authorization can be justified for real commands, and the deployed HTTP
-  path demonstrably reduces test friction. Otherwise keep only the useful
-  resolver/command seam.
-- The linked configuration-lifecycle repository could not be read (HTTP 403)
-  during drafting; revisit its actual requirements before claiming parity.
-- Platform grounding: [webtrigger authentication][webtrigger],
-  [webtrigger event format][events], [app-context security][context],
-  and [Forge bridge invoke][bridge].
-- Issue tracker publication and `ready-for-agent` labeling are deferred:
-  no project issue tracker or triage vocabulary was provided for this repo.
-  Run `/setup-matt-pocock-skills` before the `to-spec` publishing step. This
-  draft is not marked ready for an implementation agent.
+The implementation facts live in the [runtime reference](../docs/reference/reference.md),
+[architectural explanation](../docs/explanation/explanation.md), and the two
+[proof guides](../docs/how-to/prove-admin-ui.md).
+The [deployed verification record](deployed-poc-verification.md) preserves the
+operator-reported 2026-10-25 HTTP pass and its limits; the
+[SecretSpec validation record](secretspec-validation.md) is historical tooling
+V&V, not another implementation plan.
 
-[config-lifecycle]: https://github.com/ibuchanan/explore-forge-config-lifecycle
-[webtrigger]: https://developer.atlassian.com/platform/forge/runtime-reference/web-trigger
-[events]: https://developer.atlassian.com/platform/forge/events-reference/web-trigger/
-[context]: https://developer.atlassian.com/platform/forge/app-context-security
-[bridge]: https://developer.atlassian.com/platform/forge/custom-ui-bridge/invoke/
+The [trigger-library outbound spec](outbound/forge-ahead-triggers.md) owns native
+contracts and outcome translation. The [commands-library seed spec](outbound/forge-ahead-commands.md)
+owns reusable command execution, the first-class JSON-RPC adapter, and generation.
+These are handoff drafts, not accepted changes in their target repositories.
+
+Issue publication and `ready-for-agent` labeling are deferred because no project
+tracker or triage vocabulary is configured. Run `/setup-matt-pocock-skills`
+before using the publishing part of `to-spec`. No remote issue was created.
