@@ -218,6 +218,32 @@ delivery/retry scheduling, deployed revision and tunnel state also remain
 unverified. Ticket 11 stays open; the historical 30-check pass above is unchanged.
 This is an evidence-only update, not a runtime change or a new TDD cycle.
 
+## Ticket 11 operator report: saved-state blocker, 2026-10-25
+
+The operator supplied a complete sanitized report from `bun run test:deployed`:
+run `d3c3dbef-3726-4d11-bad9-319eb099f48b`, started
+`2026-10-25T22:58:27.755Z`, exit code `1`, total duration `2784.852292 ms`.
+The stored endpoint was reused without a Forge lookup.
+
+| Check | Result | Duration |
+| --- | --- | --- |
+| Local preflight | Passed | 0.138291 ms |
+| Deployed readiness | Passed | 2781.206917 ms |
+| `config.get unset` | Failed: a demo prefix is already saved | 0.078208 ms |
+
+This report verifies successful authenticated HTTP `config.get` execution, even
+though the suite failed its unset-state prerequisite. It reports
+`configurationMayHaveChanged: false`: execution stopped before the write phase.
+No `config.set`, HTTP reset-denial, or preview result was established; UI-admin
+coverage, isolation and installed UI remain unverified. Exact deployed revision,
+installation identity, backend-log inspection and native delivery also remain
+unverified. The earlier interrupted run and historical HTTP pass are unchanged.
+
+Ticket 11 remains blocked on existing configuration. With permission to discard
+that configuration, an authorized administrator can use **Configure > Reset
+configuration**, then explicitly rerun the verifier; a completed suite leaves
+`poc-😀` saved. No reset or additional live request was performed by the assistant.
+
 ## Live acceptance evidence
 
 Statuses below reflect the dated operator-supplied report, not an independent
