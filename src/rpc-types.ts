@@ -1,20 +1,8 @@
 import type { JSONRPCResponse } from "json-rpc-2.0";
 
-export type Commands = {
-  "config.get": {
-    params: Record<string, never>;
-    result: { configured: boolean; prefix: string | null };
-  };
-  "config.set": { params: { prefix: string }; result: { configured: true } };
-  "config.reset": {
-    params: { confirm: true };
-    result: { configured: false };
-  };
-  "integration.preview": {
-    params: { text: string };
-    result: { output: string };
-  };
-};
+import type { Commands } from "./executor";
+
+export type { Commands } from "./executor";
 
 export type RpcRequest = {
   [M in keyof Commands]: {

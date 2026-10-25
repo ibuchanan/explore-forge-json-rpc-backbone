@@ -8,15 +8,15 @@ import {
   type JSONRPCResponse,
   JSONRPCServer,
 } from "json-rpc-2.0";
+import {
+  type Caller,
+  type CommandFailure,
+  execute,
+  type PrefixStore,
+} from "./executor";
 import { logger } from "./logging";
 
-export interface PrefixStore {
-  get(): Promise<string | undefined>;
-  set(prefix: string): Promise<void>;
-  reset(): Promise<void>;
-}
-
-export type Caller = { source: "api" | "ui"; authorized: boolean };
+export type { Caller, PrefixStore } from "./executor";
 type CommandContext = { caller: Caller; store: PrefixStore };
 
 // The library's default error listener logs raw exceptions (including secrets).
@@ -44,11 +44,27 @@ const invalidParams = (): never => {
   throw new JSONRPCErrorException("Invalid params", -32602);
 };
 
-server.addMethod("config.get", async (params, { store }) => {
-  if (!object(params, [])) invalidParams();
-  const prefix = await store.get();
-  return { configured: prefix !== undefined, prefix: prefix ?? null };
-});
+const commandErrors: Record<CommandFailure, { code: number; message: string }> =
+  {
+    forbidden: { code: -32001, message: "Forbidden" },
+    "method-not-found": { code: -32601, message: "Method not found" },
+    "invalid-params": { code: -32602, message: "Invalid params" },
+    "not-configured": { code: -32002, message: "Not configured" },
+    internal: { code: -32603, message: "Internal error" },
+  };
+
+for (const method of ["config.get", "integration.preview"] as const) {
+  server.addMethod(method, async (params, { caller, store }) => {
+    const result = await execute(method, params, caller, store);
+    return result.match(
+      (value) => value,
+      (failure) => {
+        const { code, message } = commandErrors[failure];
+        throw new JSONRPCErrorException(message, code);
+      },
+    );
+  });
+}
 server.addMethod("config.set", async (params, { store }) => {
   if (!object(params, ["prefix"]) || typeof params["prefix"] !== "string")
     invalidParams();
@@ -65,17 +81,6 @@ server.addMethod("config.reset", async (params, { caller, store }) => {
   }
   await store.reset();
   return { configured: false };
-});
-
-server.addMethod("integration.preview", async (params, { store }) => {
-  if (!object(params, ["text"]) || typeof params["text"] !== "string")
-    invalidParams();
-  const text = params["text"] as string;
-  if ([...text].length > 2000) invalidParams();
-  const prefix = await store.get();
-  if (prefix === undefined)
-    throw new JSONRPCErrorException("Not configured", -32002);
-  return { output: prefix + text };
 });
 
 export const rpcError = (

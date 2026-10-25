@@ -57,18 +57,23 @@ idempotency key or a background-job completion mechanism.
 
 ## Why the next extraction separates outcomes from envelopes
 
-Today, handlers throw JSON-RPC-specific exceptions, the dispatcher returns RPC
-envelopes, and types/validation are handwritten. That works for the two existing
-adapters because both use those envelopes. It does not yet prove a
-protocol-neutral command library or actual reuse of trigger-library plumbing:
+Reads and previews now return shared application `Result` values through a small
+neutral executor. The JSON-RPC adapter selects numeric errors and envelopes for
+both existing entry points. Keeping trusted context and storage separate from
+parameters preserves authorization without coupling those reads to a Forge
+request or RPC exception. Types and validation are still handwritten.
+
+Save and reset still use their original JSON-RPC-specific handlers. This additive
+migration keeps the proven mutation behavior in place while establishing the
+read seam; it is not yet a complete neutral command library or proof of native
+completion. Actual trigger-library reuse also remains unproven:
 `@forge-ahead/triggers` is declared but not imported by runtime source.
 
-The proposed next step is smaller than a new event framework: let a handler
-return an application `Result`, let a common executor enforce validation and
-policy, and let an adapter choose the representation. JSON-RPC remains a
-first-class supported adapter rather than becoming an incidental example.
-The [main spec](../../specs/spec.md) describes this future work; it is not current
-runtime behavior.
+The next step is to migrate mutations through the same outcome boundary, not add
+a new event framework. JSON-RPC remains a first-class supported adapter rather
+than becoming an incidental example. The [main spec](../../specs/spec.md) owns
+that remaining work; the [runtime reference](../reference/reference.md) records
+the implemented boundary.
 
 Native completion is the important variation. An HTTP caller needs a response;
 a UI needs serializable data; an async consumer needs acknowledgement or a native

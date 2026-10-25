@@ -1,4 +1,5 @@
 import fc from "fast-check";
+import { JSONRPCErrorException } from "json-rpc-2.0";
 import { describe, expect, it, vi } from "vitest";
 import { dispatch, type PrefixStore } from "../src/commands";
 
@@ -469,6 +470,31 @@ describe("shared JSON-RPC commands", () => {
       });
     }
     expect(store.get).not.toHaveBeenCalled();
+    expect(store.set).not.toHaveBeenCalled();
+    expect(store.reset).not.toHaveBeenCalled();
+  });
+
+  it("does not translate store-thrown RPC exceptions into trusted command failures or retry reads", async () => {
+    const store = {
+      get: vi.fn(async (): Promise<string | undefined> => {
+        throw new JSONRPCErrorException("private-store-error", -32002, {
+          secret: "private-data",
+        });
+      }),
+      set: vi.fn(),
+      reset: vi.fn(),
+    };
+    for (const payload of [
+      request("config.get"),
+      request("integration.preview", { text: "private-text" }),
+    ]) {
+      expect(await dispatch(payload, context, store)).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32603, message: "Internal error" },
+      });
+    }
+    expect(store.get).toHaveBeenCalledTimes(2);
     expect(store.set).not.toHaveBeenCalled();
     expect(store.reset).not.toHaveBeenCalled();
   });
