@@ -1,6 +1,10 @@
 # Reference
 
 - [OpenRPC contract](openrpc.json): machine-readable JSON-RPC API declaration.
+- [POC verification record](../../specs/deployed-poc-verification.md): local
+  evidence, unverified live acceptance, release caveats, and provisional decision.
+- [Deployed HTTP verification](../how-to/how-to.md#verify-the-deployed-http-lifecycle):
+  opt-in procedure and operator safety requirements.
 - [SecretSpec app declaration](../../secretspec.toml): required names, provider
   routes, defaults, and runtime scope for this app.
 - [Package scripts](../../package.json): configured Forge workflows and checks.
