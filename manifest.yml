@@ -12,11 +12,25 @@ modules:
       handler: resolver.handler
   jira:adminPage:
     - key: config-admin
+      resource: status-ui
+      render: native
+      resolver:
+        function: config-resolver
+      title: JSON-RPC status
+    - key: config-configure
       resource: config-ui
       render: native
       resolver:
         function: config-resolver
-      title: JSON-RPC configuration
+      title: Configure
+      useAsConfig: true
+    - key: config-get-started
+      resource: get-started-ui
+      render: native
+      resolver:
+        function: config-resolver
+      title: Get started
+      useAsGetStarted: true
 app:
   runtime:
     name: nodejs24.x
@@ -30,3 +44,7 @@ permissions:
 resources:
   - key: config-ui
     path: src/frontend/index.tsx
+  - key: status-ui
+    path: src/frontend/status.tsx
+  - key: get-started-ui
+    path: src/frontend/get-started.tsx

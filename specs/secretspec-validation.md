@@ -98,8 +98,9 @@ of these changed guides reports none.
 The security rationale, user-provider setup, provider diagnosis, and general
 Forge workflow documentation have moved to Fence Rider. This repository
 retains the concrete `RPC_BEARER_SECRET` declaration, its package scripts,
-[app-specific guidance](../docs/how-to/how-to.md), and this historical evidence
-record under `specs/`. See the [upstream documentation][fence-rider-docs] for
-maintained shared guidance and current verification status.
+[app-specific guidance](../DEVELOPMENT.md#configure-this-repositorys-variables),
+and this historical evidence record under `specs/`. See the
+[upstream documentation][fence-rider-docs] for maintained shared guidance and
+current verification status.
 
 [fence-rider-docs]: https://github.com/ibuchanan/ranch-rig-fence-rider#documentation

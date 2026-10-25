@@ -101,5 +101,5 @@ the useful resolver/shared-command seam and propose removal of the web trigger.
 No removal or product API expansion is performed by this ticket.
 
 The next decision needs explicit target/live-operation approval, the
-[deployed HTTP procedure](../docs/how-to/how-to.md#verify-the-deployed-http-lifecycle),
-and the [installed-UI journey](../docs/how-to/how-to.md#verify-the-installed-admin-page).
+[deployed HTTP procedure](../docs/how-to/prove-json-rpc.md),
+and the [installed-UI journey](../docs/how-to/prove-admin-ui.md).

@@ -12,8 +12,9 @@ without duplicating behavior or conflating their security models? This is a
 Forge app repository, not an installable JSON-RPC service or a published npm
 package (`package.json` marks it private).
 
-**Current state:** A UI Kit Jira admin page and one authenticated v2 web trigger
-share `config.get`, `config.set`, and `integration.preview` through the same
+**Current state:** Three UI Kit Jira admin screens (Status, Configure, and
+Get started) and one authenticated v2 web trigger share `config.get`,
+`config.set`, and `integration.preview` through the same
 JSON-RPC dispatcher and installation-scoped KVS store. The UI resolver checks
 Jira `ADMINISTER` permission on every call; HTTP uses a separately provisioned
 bearer secret. Preview only concatenates the saved prefix and supplied text.
@@ -41,10 +42,13 @@ register a new app identity just to inspect this checkout.
 ## Next verification
 
 The [POC spec](specs/spec.md) requires local **and** deployed UI/HTTP evidence.
-The [installed-UI journey](docs/how-to/how-to.md#verify-the-installed-admin-page)
-covers save, reload, preview, and error checks after separate deployment and
-installation approval. The new `read:jira-work` scope requires an installation
-upgrade. Do not infer live acceptance from local mocks.
+[Prove it from the Admin UI](docs/how-to/prove-admin-ui.md) covers save, reload,
+preview, and error checks, with a UI-to-resolver-to-command execution trace.
+[Prove it via JSON-RPC](docs/how-to/prove-json-rpc.md) covers HTTP requests and
+the deployed verifier, with the corresponding web-trigger execution trace.
+Both require separate approval for deployment, installation, and test writes.
+The `read:jira-work` scope requires consent on existing installations that do
+not yet grant it. Do not infer live acceptance from local mocks.
 
 ## Read more
 
@@ -52,8 +56,8 @@ upgrade. Do not infer live acceptance from local mocks.
   — architectural rationale and trade-offs.
 - [POC spec](specs/spec.md) — proposed scope, contract, security, and test
   criteria.
-- [Forge app configuration](docs/how-to/how-to.md) — this app's requirements
-  and links to the shared SecretSpec and Fence Rider documentation.
+- [Forge app configuration](DEVELOPMENT.md#configure-this-repositorys-variables)
+  — this app's requirements and links to shared SecretSpec and Fence Rider docs.
 - [Development](DEVELOPMENT.md) — checks and repository layout.
 - [Contributing](CONTRIBUTING.md) and [security policy](SECURITY.md).
 
