@@ -58,31 +58,35 @@ loaded to authorize or dispatch each invocation. Types are currently handwritten
 | `-32002` | `Not configured`   | Preview requires a saved prefix                      |
 
 The shared dispatcher validates envelopes before caller authorization. Authorized
-calls then use the JSON-RPC library for method lookup and execution. Read commands
-route to the neutral executor described below; mutations retain their existing
-library handlers. Reset parameter validation precedes its source restriction.
-Authentication/HTTP guards occur before this dispatcher. Unexpected exception
-messages, stacks, and error data are not returned. Neutral failures map to fixed
-public text; mutation handlers retain their allowlisted command errors.
+calls then use the JSON-RPC library for method lookup. All four commands route to
+the neutral executor described below. Reset parameter validation precedes its
+source restriction. Authentication/HTTP guards occur before this dispatcher.
+Unexpected exception messages, stacks, and error data are not returned. Neutral
+failures map to fixed public text.
 
-### Neutral read executor
+### Neutral command executor
 
-`src/executor.ts` exports `execute(method, params, caller, store)` for
-`config.get` and `integration.preview`. Parameters are untrusted; caller context
-and the storage adapter are separate, server-constructed arguments. The return
-value is `Promise<Result<Output, CommandFailure>>` from `@forge-ahead/errors`,
-not an RPC response or exception. The core imports no Forge or JSON-RPC runtime.
+`src/executor.ts` exports `execute(method, params, caller, store)` for all four
+commands. Parameters are untrusted; caller context and the storage adapter are
+separate, server-constructed arguments. The return value is
+`Promise<Result<Output, CommandFailure>>` from `@forge-ahead/errors`, not an RPC
+response or exception. The core imports no Forge or JSON-RPC runtime.
 
 Authorization precedes parameter validation and storage. Semantic failures are
 `forbidden`, `method-not-found`, `invalid-params`, `not-configured`, and `internal`.
-Storage exceptions become `internal` regardless of exception type or message.
-The JSON-RPC adapter in `src/commands.ts` maps failures to the codes above and
-frames the response. Both HTTP and the UI resolver use that same adapter.
+The app-owned reset policy requires valid confirmation followed by an authorized
+UI caller; a valid HTTP credential never grants reset authority. Storage
+exceptions become `internal` regardless of exception type or message. The adapter
+in `src/commands.ts` maps failures to the codes above and frames the response.
+Both HTTP and the UI resolver use that same adapter.
 
-`config.set` and `config.reset` remain on the legacy JSON-RPC handler path during
-this first migration. Each command is registered once, with no fallback, retry,
-or second execution after failure. Their migration is still pending. The shared
-handwritten `Commands` contract lives with the executor and is re-exported by
+Successful set/reset invokes the selected storage operation once, without an
+implicit read-back. An exception after persistence returns `internal`; it does
+not establish rollback, trigger a retry, or restore earlier configuration. A
+separate read observes the resulting state. Each command is registered once from
+`commandNames`, whose name set is checked against OpenRPC, with no legacy handler
+path or fallback. The shared handwritten `Commands` contract lives with the
+executor and is re-exported by
 `rpc-types.ts`; generated contracts and runtime output validation remain pending.
 
 ## Identity and authorization
@@ -200,7 +204,7 @@ and the [JSON-RPC proof guide](../how-to/prove-json-rpc.md) for procedures.
 ## Related records
 
 - [OpenRPC contract](openrpc.json): all four commands, including reset denial.
-- [JSON-RPC adapter](../../src/commands.ts) and [neutral reads](../../src/executor.ts):
+- [JSON-RPC adapter](../../src/commands.ts) and [neutral executor](../../src/executor.ts):
   current dispatch and execution boundaries.
 - [Deployed V&V record](../../specs/deployed-poc-verification.md): operator-reported
   HTTP pass; installed UI, isolation, and backend-log acceptance remain separate.

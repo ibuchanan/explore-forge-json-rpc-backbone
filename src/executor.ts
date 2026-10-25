@@ -34,7 +34,7 @@ const object = (
   Object.keys(params).length === keys.length &&
   keys.every((key) => Object.hasOwn(params, key));
 
-export type ReadCommand = "config.get" | "integration.preview";
+export type Command = keyof Commands;
 export type CommandFailure =
   | "forbidden"
   | "method-not-found"
@@ -43,14 +43,29 @@ export type CommandFailure =
   | "internal";
 
 export async function execute(
-  method: ReadCommand,
+  method: Command,
   params: unknown,
   caller: Caller,
   store: PrefixStore,
-): Promise<Result<Commands[ReadCommand]["result"], CommandFailure>> {
+): Promise<Result<Commands[Command]["result"], CommandFailure>> {
   if (!caller.authorized || !["api", "ui"].includes(caller.source))
     return err("forbidden");
   try {
+    if (method === "config.set") {
+      if (!object(params, ["prefix"]) || typeof params["prefix"] !== "string")
+        return err("invalid-params");
+      const prefix = params["prefix"].trim();
+      if (!prefix || [...prefix].length > 64) return err("invalid-params");
+      await store.set(prefix);
+      return ok({ configured: true });
+    }
+    if (method === "config.reset") {
+      if (!object(params, ["confirm"]) || params["confirm"] !== true)
+        return err("invalid-params");
+      if (caller.source !== "ui") return err("forbidden");
+      await store.reset();
+      return ok({ configured: false });
+    }
     if (method === "config.get") {
       if (!object(params, [])) return err("invalid-params");
       const prefix = await store.get();

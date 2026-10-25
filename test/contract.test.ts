@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
-import { dispatch } from "../src/commands";
+import { commandNames, dispatch } from "../src/commands";
 
 const contract = JSON.parse(
   readFileSync(
@@ -55,12 +55,15 @@ describe("OpenRPC contract", () => {
     expect(
       contract["x-protocolErrors"].map(({ code }: { code: number }) => code),
     ).toEqual([-32700, -32600, -32601, -32602, -32603, -32001]);
-    expect(contract.methods.map(({ name }: { name: string }) => name)).toEqual([
+    const names = contract.methods.map(({ name }: { name: string }) => name);
+    expect(names).toEqual([
       "config.get",
       "config.set",
       "integration.preview",
       "config.reset",
     ]);
+    expect([...commandNames].sort()).toEqual([...names].sort());
+    expect(new Set(commandNames).size).toBe(commandNames.length);
     expect(
       contract.methods.every(
         ({ paramStructure }: { paramStructure: string }) =>

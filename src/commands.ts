@@ -31,19 +31,6 @@ server.mapErrorToJSONRPCErrorResponse = (id, error: unknown) =>
         "Internal error",
       );
 
-const object = (
-  params: unknown,
-  keys: string[],
-): params is Record<string, unknown> =>
-  params !== null &&
-  typeof params === "object" &&
-  !Array.isArray(params) &&
-  Object.keys(params).length === keys.length &&
-  keys.every((key) => Object.hasOwn(params, key));
-const invalidParams = (): never => {
-  throw new JSONRPCErrorException("Invalid params", -32602);
-};
-
 const commandErrors: Record<CommandFailure, { code: number; message: string }> =
   {
     forbidden: { code: -32001, message: "Forbidden" },
@@ -53,7 +40,14 @@ const commandErrors: Record<CommandFailure, { code: number; message: string }> =
     internal: { code: -32603, message: "Internal error" },
   };
 
-for (const method of ["config.get", "integration.preview"] as const) {
+export const commandNames = [
+  "config.get",
+  "config.set",
+  "config.reset",
+  "integration.preview",
+] as const;
+
+for (const method of commandNames) {
   server.addMethod(method, async (params, { caller, store }) => {
     const result = await execute(method, params, caller, store);
     return result.match(
@@ -65,24 +59,6 @@ for (const method of ["config.get", "integration.preview"] as const) {
     );
   });
 }
-server.addMethod("config.set", async (params, { store }) => {
-  if (!object(params, ["prefix"]) || typeof params["prefix"] !== "string")
-    invalidParams();
-  const prefix = (params["prefix"] as string).trim();
-  if (!prefix || [...prefix].length > 64) invalidParams();
-  await store.set(prefix);
-  return { configured: true };
-});
-server.addMethod("config.reset", async (params, { caller, store }) => {
-  if (!object(params, ["confirm"]) || params["confirm"] !== true)
-    invalidParams();
-  if (caller.source !== "ui") {
-    throw new JSONRPCErrorException("Forbidden", -32001);
-  }
-  await store.reset();
-  return { configured: false };
-});
-
 export const rpcError = (
   id: string | number | null,
   code: number,
@@ -110,9 +86,7 @@ export async function dispatch(
       ? (value as Record<string, unknown>)
       : null;
   const method =
-    ["config.get", "config.set", "config.reset", "integration.preview"].find(
-      (known) => known === candidate?.["method"],
-    ) ?? "unknown";
+    commandNames.find((known) => known === candidate?.["method"]) ?? "unknown";
   const log = logger.child({
     invocationId: randomUUID(),
     source:

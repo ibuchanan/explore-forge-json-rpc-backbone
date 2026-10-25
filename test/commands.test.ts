@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { JSONRPCErrorException } from "json-rpc-2.0";
 import { describe, expect, it, vi } from "vitest";
 import { dispatch, type PrefixStore } from "../src/commands";
+import { logRecords } from "./logging";
 
 const request = (
   method: string,
@@ -497,6 +498,70 @@ describe("shared JSON-RPC commands", () => {
     expect(store.get).toHaveBeenCalledTimes(2);
     expect(store.set).not.toHaveBeenCalled();
     expect(store.reset).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes mutation exceptions after persistence without retry, rollback, or implicit read-back", async () => {
+    for (const thrown of [
+      new Error("private-store-error"),
+      new JSONRPCErrorException("private-store-error", -32001, {
+        secret: "private-data",
+      }),
+      new JSONRPCErrorException("private-store-error", -32602),
+      new JSONRPCErrorException("private-store-error", -32002),
+    ]) {
+      for (const [method, params, expected] of [
+        ["config.set", { prefix: "  private-new  " }, "private-new"],
+        ["config.reset", { confirm: true }, null],
+      ] as const) {
+        let saved: string | undefined = "private-original";
+        const store = {
+          get: vi.fn(async () => saved),
+          set: vi.fn(async (value: string) => {
+            saved = value;
+            throw thrown;
+          }),
+          reset: vi.fn(async () => {
+            saved = undefined;
+            throw thrown;
+          }),
+        };
+        const caller = { source: "ui" as const, authorized: true };
+        const start = logRecords().length;
+        expect(await dispatch(request(method, params), caller, store)).toEqual({
+          jsonrpc: "2.0",
+          id: 1,
+          error: { code: -32603, message: "Internal error" },
+        });
+        const records = logRecords().slice(start);
+        expect(JSON.stringify(records)).not.toContain("private-");
+        expect(
+          records
+            .filter((record) => record["operation"] === "rpc.complete")
+            .at(-1),
+        ).toMatchObject({
+          outcome: "failed",
+          rpcCode: -32603,
+          level: "error",
+        });
+        expect(
+          records.some((record) =>
+            String(record["msg"]).includes("a write may be uncertain"),
+          ),
+        ).toBe(true);
+        expect(store.get).not.toHaveBeenCalled();
+        expect(store.set).toHaveBeenCalledTimes(
+          method === "config.set" ? 1 : 0,
+        );
+        expect(store.reset).toHaveBeenCalledTimes(
+          method === "config.reset" ? 1 : 0,
+        );
+        expect(await dispatch(request("config.get"), caller, store)).toEqual({
+          jsonrpc: "2.0",
+          id: 1,
+          result: { configured: expected !== null, prefix: expected },
+        });
+      }
+    }
   });
 
   it("sanitizes unexpected storage failures without logging exception details", async () => {

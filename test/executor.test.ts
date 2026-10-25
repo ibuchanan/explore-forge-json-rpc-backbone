@@ -58,12 +58,18 @@ it("sanitizes thrown store failures into semantic Results without trusting error
       get: vi.fn(async (): Promise<string | undefined> => {
         throw thrown;
       }),
-      set: vi.fn(),
-      reset: vi.fn(),
+      set: vi.fn(async () => {
+        throw thrown;
+      }),
+      reset: vi.fn(async () => {
+        throw thrown;
+      }),
     };
     for (const [method, params] of [
       ["config.get", {}],
       ["integration.preview", { text: "private-text" }],
+      ["config.set", { prefix: "private-prefix" }],
+      ["config.reset", { confirm: true }],
     ] as const) {
       const result = await execute(
         method,
@@ -75,14 +81,142 @@ it("sanitizes thrown store failures into semantic Results without trusting error
       expect(JSON.stringify(result)).not.toContain("private-");
     }
     expect(store.get).toHaveBeenCalledTimes(2);
-    expect(store.set).not.toHaveBeenCalled();
-    expect(store.reset).not.toHaveBeenCalled();
+    expect(store.set).toHaveBeenCalledExactlyOnceWith("private-prefix");
+    expect(store.reset).toHaveBeenCalledTimes(1);
   }
 });
 
-it("rejects names outside the migrated read commands without falling through to preview", async () => {
+it("saves a normalized prefix once for either authorized caller and reads it back separately", async () => {
+  for (const source of ["api", "ui"] as const) {
+    for (const [prefix, expected] of [
+      ["  café 😀\n", "café 😀"],
+      [` \t${"😀".repeat(64)}\n `, "😀".repeat(64)],
+    ]) {
+      let saved: string | undefined;
+      const store = {
+        get: vi.fn(async () => saved),
+        set: vi.fn(async (value: string) => {
+          saved = value;
+        }),
+        reset: vi.fn(),
+      };
+      const caller = { source, authorized: true };
+      expect(await execute("config.set", { prefix }, caller, store)).toEqual(
+        ok({ configured: true }),
+      );
+      expect(store.set).toHaveBeenCalledExactlyOnceWith(expected);
+      expect(store.get).not.toHaveBeenCalled();
+      expect(store.reset).not.toHaveBeenCalled();
+      expect(await execute("config.get", {}, caller, store)).toEqual(
+        ok({ configured: true, prefix: expected }),
+      );
+    }
+  }
+});
+
+it("requires authorized UI confirmation to reset once, with read-back kept separate", async () => {
+  let saved: string | undefined = "keep";
+  const store = {
+    get: vi.fn(async () => saved),
+    set: vi.fn(),
+    reset: vi.fn(async () => {
+      saved = undefined;
+    }),
+  };
+  for (const [params, caller, failure] of [
+    [{}, { source: "ui", authorized: false }, "forbidden"],
+    [{ confirm: true }, { source: "api", authorized: false }, "forbidden"],
+    [{ confirm: true }, { source: "event", authorized: true }, "forbidden"],
+    [{}, { source: "api", authorized: true }, "invalid-params"],
+    [{ confirm: true }, { source: "api", authorized: true }, "forbidden"],
+  ] as const) {
+    expect(
+      await execute(
+        "config.reset",
+        params,
+        caller as Parameters<typeof execute>[2],
+        store,
+      ),
+    ).toEqual(err(failure));
+  }
+  expect(store.get).not.toHaveBeenCalled();
+  expect(store.set).not.toHaveBeenCalled();
+  expect(store.reset).not.toHaveBeenCalled();
+  const caller = { source: "ui" as const, authorized: true };
+  expect(
+    await execute("config.reset", { confirm: true }, caller, store),
+  ).toEqual(ok({ configured: false }));
+  expect(store.reset).toHaveBeenCalledTimes(1);
+  expect(store.get).not.toHaveBeenCalled();
+  expect(store.set).not.toHaveBeenCalled();
+  expect(await execute("config.get", {}, caller, store)).toEqual(
+    ok({ configured: false, prefix: null }),
+  );
+});
+
+it("rejects malformed mutation parameters and claimed authority without storage effects", async () => {
   const store = { get: vi.fn(), set: vi.fn(), reset: vi.fn() };
-  for (const method of ["unknown", "config.set", "config.reset"]) {
+  for (const source of ["api", "ui"] as const) {
+    const caller = { source, authorized: true };
+    for (const params of [
+      undefined,
+      null,
+      [],
+      "",
+      7,
+      {},
+      { prefix: null },
+      { prefix: 7 },
+      { prefix: " \t\n" },
+      { prefix: "a".repeat(65) },
+      { prefix: "😀".repeat(65) },
+      { prefix: "e\u0301".repeat(33) },
+      { prefix: "valid", caller: { source: "ui", authorized: true } },
+    ]) {
+      expect(await execute("config.set", params, caller, store)).toEqual(
+        err("invalid-params"),
+      );
+    }
+    for (const params of [
+      undefined,
+      null,
+      [],
+      "",
+      7,
+      {},
+      { confirm: false },
+      { confirm: 1 },
+      { confirm: "true" },
+      { confirm: null },
+      { confirm: [] },
+      { confirm: {} },
+      { confirm: true, extra: "field" },
+      { confirm: true, source: "ui" },
+      { confirm: true, caller: { source: "ui", authorized: true } },
+    ]) {
+      expect(await execute("config.reset", params, caller, store)).toEqual(
+        err("invalid-params"),
+      );
+    }
+  }
+  for (const source of ["api", "ui"] as const) {
+    for (const [method, params] of [
+      ["config.set", { prefix: "valid" }],
+      ["config.reset", { confirm: true }],
+    ] as const) {
+      expect(
+        await execute(method, params, { source, authorized: false }, store),
+      ).toEqual(err("forbidden"));
+    }
+  }
+  expect(store.get).not.toHaveBeenCalled();
+  expect(store.set).not.toHaveBeenCalled();
+  expect(store.reset).not.toHaveBeenCalled();
+});
+
+it("rejects unknown names without falling through to a command", async () => {
+  const store = { get: vi.fn(), set: vi.fn(), reset: vi.fn() };
+  for (const method of ["unknown", "toString", "constructor"]) {
     expect(
       await execute(
         method as Parameters<typeof execute>[0],

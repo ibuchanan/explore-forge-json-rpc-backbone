@@ -57,23 +57,25 @@ idempotency key or a background-job completion mechanism.
 
 ## Why the next extraction separates outcomes from envelopes
 
-Reads and previews now return shared application `Result` values through a small
+All four commands now return shared application `Result` values through a small
 neutral executor. The JSON-RPC adapter selects numeric errors and envelopes for
 both existing entry points. Keeping trusted context and storage separate from
-parameters preserves authorization without coupling those reads to a Forge
-request or RPC exception. Types and validation are still handwritten.
+parameters preserves authorization without coupling handlers to a Forge request
+or RPC exception. Types and validation are still handwritten.
 
-Save and reset still use their original JSON-RPC-specific handlers. This additive
-migration keeps the proven mutation behavior in place while establishing the
-read seam; it is not yet a complete neutral command library or proof of native
-completion. Actual trigger-library reuse also remains unproven:
-`@forge-ahead/triggers` is declared but not imported by runtime source.
+Migrating reads first and mutations second preserved a working baseline without
+leaving a permanent second execution path. Reset policy stays in the app-owned
+executor, not in the transport or schema: valid confirmation and UI authorization
+are both required. A storage exception cannot impersonate a trusted command error,
+and a failed write is not automatically retried or rolled back.
 
-The next step is to migrate mutations through the same outcome boundary, not add
-a new event framework. JSON-RPC remains a first-class supported adapter rather
-than becoming an incidental example. The [main spec](../../specs/spec.md) owns
-that remaining work; the [runtime reference](../reference/reference.md) records
-the implemented boundary.
+This is not yet a complete reusable command library or proof of native completion.
+Actual trigger-library reuse also remains unproven: `@forge-ahead/triggers` is
+declared but not imported by runtime source. Generated contracts and runtime
+output validation are still future work. JSON-RPC remains a first-class supported
+adapter rather than becoming an incidental example. The
+[main spec](../../specs/spec.md) owns that remaining work; the
+[runtime reference](../reference/reference.md) records the implemented boundary.
 
 Native completion is the important variation. An HTTP caller needs a response;
 a UI needs serializable data; an async consumer needs acknowledgement or a native
