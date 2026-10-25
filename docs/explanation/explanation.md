@@ -61,7 +61,8 @@ All four commands now return shared application `Result` values through a small
 neutral executor. The JSON-RPC adapter selects numeric errors and envelopes for
 both existing entry points. Keeping trusted context and storage separate from
 parameters preserves authorization without coupling handlers to a Forge request
-or RPC exception. Types and validation are still handwritten.
+or RPC exception. Command types now come from OpenRPC; runtime validation and
+application policy remain handwritten.
 
 Migrating reads first and mutations second preserved a working baseline without
 leaving a permanent second execution path. Reset policy stays in the app-owned
@@ -71,8 +72,8 @@ and a failed write is not automatically retried or rolled back.
 
 This is not yet a complete reusable command library or proof of native completion.
 Actual trigger-library reuse also remains unproven: `@forge-ahead/triggers` is
-declared but not imported by runtime source. Generated contracts and runtime
-output validation are still future work. JSON-RPC remains a first-class supported
+declared but not imported by runtime source. Runtime output validation is still
+future work. JSON-RPC remains a first-class supported
 adapter rather than becoming an incidental example. The
 [main spec](../../specs/spec.md) owns that remaining work; the
 [runtime reference](../reference/reference.md) records the implemented boundary.
@@ -91,12 +92,14 @@ rule follows from an HTTP status or RPC error code.
 ## Why OpenRPC is useful without generating business policy
 
 A contract-first catalog can reduce drift between handlers, clients, schemas,
-and tests. The current contract tests already validate the OpenRPC document and
-compare examples and successful outputs with execution. They do not currently
-generate implementation types or drive runtime parameter validation.
+and tests. The contract tests validate the OpenRPC document and compare examples
+and successful outputs with execution. The selected build-time generator now
+supplies the types used by app handlers, the frontend caller, and integration
+fixtures. A stale artifact fails the check-only workflow; after regeneration,
+a new command cannot compile until its app-owned handler is implemented.
 
-The planned generation experiment targets types, handler maps, names, validators,
-and call helpers. Implementations and authorization stay handwritten. Prefix
+Generation supplies contracts and names, not handler bodies or authority.
+Implementations, runtime validation, and authorization stay handwritten. Prefix
 normalization illustrates the limit: length is validated after trimming, so
 blind validation of raw input can change behavior despite matching a schema.
 Generated types cannot enforce runtime length or resource authorization.

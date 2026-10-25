@@ -1,6 +1,6 @@
 # Development
 
-<!-- cspell:words webtrigger -->
+<!-- cspell:words webtrigger openrpc -->
 
 Install dependencies with `npm install`. Forge wrappers also require Bun
 1.4.3+, SecretSpec 0.21.1+, and an authenticated Forge CLI on `PATH`.
@@ -255,6 +255,29 @@ runtime token, encrypted; `forge:deploy` never uploads values. A changed Forge
 variable becomes active after deployment. For code-only changes with an
 unchanged token, omit the upload. Do not copy the upstream generic script names
 into commands here: this repository uses the `forge:*` names in `package.json`.
+
+## Regenerate command contracts
+
+After editing `docs/reference/openrpc.json`, regenerate the tracked contract and
+check its consumers:
+
+```sh
+bun run generate:commands
+bun run generate:commands:check
+bun run typecheck
+bun run test -- test/generation.test.ts test/contract.test.ts
+```
+
+Do not edit `src/generated/commands.ts` manually. Implement new commands in the
+handwritten handler map in `src/executor.ts`; regeneration does not create handler
+bodies or grant permissions. A missing handler fails typecheck after generation.
+Keep runtime normalization and validation tests when changing schemas.
+
+Use `bun run generate:commands:check` for read-only drift detection. It exits
+nonzero for missing or stale output without rewriting files. `bun run check`
+includes this check; it does not regenerate or accept changed artifacts silently.
+The [contract reference](docs/reference/reference.md#generated-contract) defines
+the supported schema subset and remaining runtime checks.
 
 ## Run repository checks
 

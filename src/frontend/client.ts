@@ -1,5 +1,6 @@
 import { makeInvoke } from "@forge/bridge";
-import type { Commands, RpcDefinitions, RpcRequest } from "../rpc-types";
+import type { Commands, TypedCaller } from "../generated/commands";
+import type { RpcDefinitions, RpcRequest } from "../rpc-types";
 
 const invoke = makeInvoke<RpcDefinitions>();
 let sequence = 0;
@@ -10,10 +11,10 @@ export class RpcFailure extends Error {
   }
 }
 
-export async function rpc<M extends keyof Commands>(
+export const rpc: TypedCaller = async <M extends keyof Commands>(
   method: M,
   params: Commands[M]["params"],
-): Promise<Commands[M]["result"]> {
+): Promise<Commands[M]["result"]> => {
   const id = ++sequence;
   const response = await invoke("rpc", {
     jsonrpc: "2.0",
@@ -27,7 +28,7 @@ export async function rpc<M extends keyof Commands>(
   const result = response.result as Commands[M]["result"];
   if (!result || typeof result !== "object") throw new Error("Invalid result");
   return result;
-}
+};
 
 export function failureMessage(error: unknown): string {
   if (error instanceof RpcFailure) {

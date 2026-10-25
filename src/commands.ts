@@ -14,7 +14,10 @@ import {
   execute,
   type PrefixStore,
 } from "./executor";
+import { commandNames } from "./generated/commands";
 import { logger } from "./logging";
+
+export { commandNames } from "./generated/commands";
 
 export type { Caller, PrefixStore } from "./executor";
 type CommandContext = { caller: Caller; store: PrefixStore };
@@ -39,13 +42,6 @@ const commandErrors: Record<CommandFailure, { code: number; message: string }> =
     "not-configured": { code: -32002, message: "Not configured" },
     internal: { code: -32603, message: "Internal error" },
   };
-
-export const commandNames = [
-  "config.get",
-  "config.set",
-  "config.reset",
-  "integration.preview",
-] as const;
 
 for (const method of commandNames) {
   server.addMethod(method, async (params, { caller, store }) => {

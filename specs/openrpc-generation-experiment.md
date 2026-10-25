@@ -18,8 +18,11 @@ No generated handler bodies, listeners, CLI, authorization, or retries are added
 ## Reproducible evidence
 
 The retained samples are [`test/generation.test.ts`](../test/generation.test.ts)
-and its [bounded traversal](../test/generation/experiment.ts). Generated output
-and compile samples stay in memory; no disposable generated file is retained.
+and its [bounded traversal](../scripts/command-contracts.ts), promoted to build-time
+tooling by ticket 05. The observations below retain ticket 02's historical scope.
+Experiment output and compile samples stay in memory; no disposable generated
+file is retained. The consumed app contract is now tracked separately in
+`src/generated/commands.ts`.
 The TypeScript compiler checks real imports, shared `Result`, positive examples,
 and `@ts-expect-error` negative examples with strict null/optional checking.
 

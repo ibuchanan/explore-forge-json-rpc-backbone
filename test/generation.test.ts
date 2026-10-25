@@ -1,14 +1,18 @@
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import OpenRPCTypings from "@open-rpc/typings";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { generate } from "./generation/experiment";
+import { generate } from "../scripts/command-contracts";
 
 const document = () =>
   JSON.parse(readFileSync("docs/reference/openrpc.json", "utf8"));
 
-function diagnostics(source: string): string[] {
+function diagnostics(
+  source: string,
+  overrides: Record<string, string> = {},
+): string[] {
   const filename = resolve("tmp_rovo_generation.ts");
   const options: ts.CompilerOptions = {
     strict: true,
@@ -30,12 +34,14 @@ function diagnostics(source: string): string[] {
   ) =>
     path === filename
       ? ts.createSourceFile(path, source, languageVersion, true)
-      : getSourceFile(
-          path,
-          languageVersion,
-          onError,
-          shouldCreateNewSourceFile,
-        );
+      : overrides[path] !== undefined
+        ? ts.createSourceFile(path, overrides[path], languageVersion, true)
+        : getSourceFile(
+            path,
+            languageVersion,
+            onError,
+            shouldCreateNewSourceFile,
+          );
   return ts
     .getPreEmitDiagnostics(ts.createProgram([filename], options, host))
     .map((diagnostic) =>
@@ -84,10 +90,79 @@ const extraHandlers: HandlerMap<Context, Failure> = {
 const plainOutput: HandlerMap<Context, Failure>["config.set"] = async () => ({ configured: true });
 `;
 
-describe("bounded OpenRPC generation experiment", () => {
-  it("compiles named handlers and a typed caller for all four real commands", async () => {
+describe("OpenRPC contract generation", () => {
+  it("makes an added OpenRPC command fail compilation of the real app handler map", async () => {
+    const contract = document();
+    contract.methods.push({ ...contract.methods[0], name: "config.inspect" });
+    const messages = diagnostics('import "./src/executor";', {
+      [resolve("src/generated/commands.ts")]: await generate(contract),
+    });
+    expect(
+      messages.some((message) =>
+        /config.inspect.*missing|missing.*config.inspect/s.test(message),
+      ),
+    ).toBe(true);
+  });
+  it("checks the real frontend caller and integration request types", () => {
+    expect(
+      diagnostics(`
+      import { rpc } from "./src/frontend/client";
+      import type { RpcRequest } from "./src/rpc-types";
+      const saved: Promise<{ configured: true }> = rpc("config.set", { prefix: "hi" });
+      const reset: RpcRequest = { jsonrpc: "2.0", method: "config.reset", params: { confirm: true }, id: 1 };
+      // @ts-expect-error Real caller rejects unknown methods
+      rpc("unknown", {});
+      // @ts-expect-error Real caller rejects extra params
+      rpc("config.get", { source: "ui" });
+      // @ts-expect-error Real caller requires explicit reset confirmation
+      rpc("config.reset", { confirm: false });
+      // @ts-expect-error Real caller preserves save output literal
+      const wrong: Promise<{ configured: false }> = rpc("config.set", { prefix: "hi" });
+      // @ts-expect-error Requests retain method-to-params correlation
+      const invalid: RpcRequest = { jsonrpc: "2.0", method: "config.set", params: { text: "hi" }, id: 2 };
+    `),
+    ).toEqual([]);
+  });
+  it("detects catalog drift without writing and regeneration repairs the artifact", () => {
+    const directory = mkdtempSync(resolve("tmp_rovo_contracts_"));
+    try {
+      const input = resolve(directory, "openrpc.json");
+      const output = resolve(directory, "commands.ts");
+      const contract = document();
+      writeFileSync(input, JSON.stringify(contract));
+      const args = ["run", "scripts/generate-commands.ts", input, output];
+      execFileSync("bun", args);
+      const original = readFileSync(output, "utf8");
+      expect(original).toContain("export interface Commands");
+      execFileSync("bun", [...args, "--check"]);
+      contract.methods.push({ ...contract.methods[0], name: "config.inspect" });
+      writeFileSync(input, JSON.stringify(contract));
+      const stale = spawnSync("bun", [...args, "--check"], {
+        encoding: "utf8",
+      });
+      expect(stale.status).toBe(1);
+      expect(stale.stderr).toMatch(/stale.*generate:commands/i);
+      expect(readFileSync(output, "utf8")).toBe(original);
+      execFileSync("bun", args);
+      expect(readFileSync(output, "utf8")).toContain('"config.inspect"');
+      execFileSync("bun", [...args, "--check"]);
+      const regenerated = readFileSync(output, "utf8");
+      execFileSync("bun", args);
+      expect(readFileSync(output, "utf8")).toBe(regenerated);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+  it("generates runtime command names alongside the compiled handler and caller contracts", async () => {
     const output = await generate(document());
-    expect(diagnostics(output + sample)).toEqual([]);
+    expect(output).toContain("export const commandNames =");
+    expect(
+      diagnostics(`${output}${sample}
+        const names: readonly CommandName[] = commandNames;
+        // @ts-expect-error Generated names retain their literal dotted spelling
+        const wrongName: typeof commandNames[number] = "config.unknown";
+      `),
+    ).toEqual([]);
   });
 
   it("resolves local schema references and preserves optional and nullable shapes deterministically", async () => {

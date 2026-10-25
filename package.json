@@ -9,8 +9,10 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "changelog": "git cliff --config cliff.toml --unreleased -o CHANGELOG.md",
-    "check": "run-p --npm-path npm --print-label lint:check:biome lint:check:forge lint:check:prelint typecheck format:check test size:check",
+    "check": "run-p --npm-path npm --print-label lint:check:biome lint:check:forge lint:check:prelint generate:commands:check typecheck format:check test size:check",
     "clean": "rm -rf dist",
+    "generate:commands": "bun run scripts/generate-commands.ts",
+    "generate:commands:check": "bun run scripts/generate-commands.ts --check",
     "forge:deploy": "cmd=$(fence-rider deploy -- --non-interactive) && sh -c \"$cmd\" sh",
     "forge:install": "cmd=$(fence-rider install -- --confirm-scopes --non-interactive) && sh -c \"$cmd\" sh",
     "forge:register": "forge register",

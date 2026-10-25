@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { createForgeLogger } from "@forge-ahead/logging";
 import { createDemoNarrative } from "@forge-ahead/logging/demo";
+import {
+  commandNames,
+  type CommandName,
+  type Commands,
+} from "../../src/generated/commands";
 
 type Environment = Record<string, string | undefined>;
 type Transport = (url: string, init: RequestInit) => Promise<Response>;
@@ -12,9 +17,9 @@ type Check = {
   message?: string;
 };
 
-const request = (
-  method: string,
-  params: unknown = {},
+const request = <M extends CommandName>(
+  method: M,
+  params: Commands[M]["params"],
   id: string | number = 0,
 ) => ({
   jsonrpc: "2.0",
@@ -32,7 +37,10 @@ const error = (id: string | number | null, code: number, message: string) => ({
   id,
   error: { code, message },
 });
-const unset = { configured: false, prefix: null };
+const unset = {
+  configured: false,
+  prefix: null,
+} satisfies Commands["config.get"]["result"];
 const prefix = "poc-😀";
 
 function endpoint(value: string | undefined): string {
@@ -77,23 +85,24 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     configurationMayHaveChanged: false,
     isolation: "unverified" as "unverified" | "verified",
     ui: "unverified" as const,
-    commandCoverage: [
-      "config.get",
-      "config.set",
-      "config.reset",
-      "integration.preview",
-    ].flatMap((command) =>
-      (["http-bearer", "ui-admin"] as const).map((principal) => ({
-        command,
-        principal,
-        expected:
-          command === "config.reset" && principal === "http-bearer"
-            ? "denial"
-            : "success",
-        successfulExecution: "unverified" as "unverified" | "verified",
-        denial: "unverified" as "unverified" | "verified",
-      })),
-    ),
+    // Keep configuration commands first in the report, independent of catalog order.
+    commandCoverage: [...commandNames]
+      .sort(
+        (a, b) =>
+          Number(b.startsWith("config.")) - Number(a.startsWith("config.")),
+      )
+      .flatMap((command) =>
+        (["http-bearer", "ui-admin"] as const).map((principal) => ({
+          command,
+          principal,
+          expected:
+            command === "config.reset" && principal === "http-bearer"
+              ? "denial"
+              : "success",
+          successfulExecution: "unverified" as "unverified" | "verified",
+          denial: "unverified" as "unverified" | "verified",
+        })),
+      ),
     checks: [] as Check[],
   };
   async function check(
@@ -336,7 +345,7 @@ export async function verifyDeployed(env: Environment, send: Transport) {
 
     const initial = await probe(
       "deployed readiness",
-      request("config.get"),
+      request("config.get", {}),
       undefined,
       { readiness: true },
     );
@@ -351,7 +360,7 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     if (isolationUrl) {
       const second = await probe(
         "second installation readiness",
-        request("config.get"),
+        request("config.get", {}),
         undefined,
         { url: isolationUrl, readiness: true },
       );
@@ -372,18 +381,18 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     ] as const) {
       await probe(
         `authorization ${name}`,
-        request("config.get"),
+        request("config.get", {}),
         "Unauthorized",
         { auth, status: 401 },
       );
     }
-    await probe("wrong verb", request("config.get"), "Method Not Allowed", {
+    await probe("wrong verb", request("config.get", {}), "Method Not Allowed", {
       method: "GET",
       status: 405,
     });
     await probe(
       "wrong media type",
-      request("config.get"),
+      request("config.get", {}),
       "Unsupported Media Type",
       { media: "text/plain", status: 415 },
     );
@@ -412,22 +421,25 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     }
     await probe(
       "unknown method",
+      // @ts-expect-error Deliberately unknown command tests runtime rejection.
       request("unknown", {}, "unknown"),
       error("unknown", -32601, "Method not found"),
     );
     await probe(
       "extra params",
+      // @ts-expect-error Deliberately invalid empty params test runtime rejection.
       request("config.get", { extra: true }),
       error(0, -32602, "Invalid params"),
     );
     await probe(
       "invalid preview params",
+      // @ts-expect-error Caller cannot override saved configuration.
       request("integration.preview", { text: "x", prefix: "override" }),
       error(0, -32602, "Invalid params"),
     );
     await probe(
       "config.get still unset",
-      request("config.get"),
+      request("config.get", {}),
       result(0, unset),
     );
     await probe(
@@ -472,7 +484,7 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     if (isolationUrl) {
       await probe(
         "second installation unset after save",
-        request("config.get"),
+        request("config.get", {}),
         result(0, unset),
         { url: isolationUrl },
       );

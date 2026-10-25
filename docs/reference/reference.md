@@ -1,5 +1,7 @@
 # Implemented command and runtime reference
 
+<!-- cspell:words openrpc -->
+
 This reference describes the current POC, not the proposed library extraction.
 The machine-readable contract is [OpenRPC 1.3.2](openrpc.json).
 The [main spec](../../specs/spec.md) contains future work; current evidence lives
@@ -45,7 +47,8 @@ missing/null IDs, and client-supplied caller context are unsupported.
 A response contains `jsonrpc: "2.0"`, the valid request ID, and exactly one
 `result` or `error`. Parse failures and invalid IDs use `id: null`. Runtime
 checks are handwritten; OpenRPC schemas are validated in contract tests, not
-loaded to authorize or dispatch each invocation. Types are currently handwritten.
+loaded to authorize each invocation. Command types and registered names are
+generated at build time from the catalog.
 
 | Code     | Message            | Meaning                                              |
 | -------- | ------------------ | ---------------------------------------------------- |
@@ -84,10 +87,42 @@ Successful set/reset invokes the selected storage operation once, without an
 implicit read-back. An exception after persistence returns `internal`; it does
 not establish rollback, trigger a retry, or restore earlier configuration. A
 separate read observes the resulting state. Each command is registered once from
-`commandNames`, whose name set is checked against OpenRPC, with no legacy handler
-path or fallback. The shared handwritten `Commands` contract lives with the
-executor and is re-exported by
-`rpc-types.ts`; generated contracts and runtime output validation remain pending.
+generated `commandNames`, with no legacy handler path or fallback.
+
+### Generated contract
+
+`docs/reference/openrpc.json` owns the catalog. The build-time traversal in
+`scripts/command-contracts.ts` delegates schema compilation to the dev dependency
+`json-schema-to-typescript` 16.0.0. `scripts/generate-commands.ts` formats output
+with the installed Biome version and owns the tracked `src/generated/commands.ts`.
+
+The artifact exports `Commands` (method-indexed named params and results), literal
+`commandNames`, `CommandName`, `HandlerMap<Context, Failure>`, and `TypedCaller`.
+The executor's app-owned handlers satisfy the exhaustive map while accepting
+unknown input for runtime validation. The JSON-RPC registration, Bridge caller,
+request types, and deployed-verifier fixtures consume the same generated contract.
+The verifier preserves configuration-first report ordering independently of
+OpenRPC declaration order.
+
+Supported schemas are the bounded subset selected by the
+[generation experiment](../../specs/openrpc-generation-experiment.md): named
+parameters; object/string/boolean/null types and nullable type arrays; properties,
+required fields, boolean additional properties, enum/const, titles/descriptions,
+and string lengths. Empty parameter lists become `Record<string, never>`.
+Only local `#/components/schemas/<name>` references are allowed; missing references
+fail and file/HTTP resolvers are disabled. Unsupported keywords/types, positional
+parameters, duplicate params, and conservatively normalized naming collisions
+fail generation. This is not a general schema compiler or remote resolver.
+
+Generated types do not validate untrusted data, enforce Unicode lengths, trim
+prefixes, preserve preview text, authorize callers, or validate successful outputs
+at runtime. Those parameter/policy checks remain in handwritten handlers;
+runtime output validation is still pending. No generated bodies or stubs exist.
+Neither generator nor schema compiler is imported by runtime source. The only
+runtime value in the artifact is the command-name tuple; `Result` is type-only.
+The deployment TypeScript configuration and the 10 kB budget are unchanged.
+See [development guidance](../../DEVELOPMENT.md#regenerate-command-contracts)
+for regeneration and read-only drift checks.
 
 ## Identity and authorization
 

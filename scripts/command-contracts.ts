@@ -1,6 +1,6 @@
 import { compile } from "json-schema-to-typescript";
 
-// This experiment is deliberately not imported by the app or its build.
+// Build-time only: the app imports the generated contract, never this compiler.
 type Schema = Parameters<typeof compile>[0];
 type Descriptor = { name: string; required?: boolean; schema: Schema };
 export type Document = {
@@ -112,13 +112,14 @@ export async function generate(document: Document): Promise<string> {
     "Commands",
     {
       bannerComment:
-        "// Generated experiment; not an application implementation.",
+        "// Generated from docs/reference/openrpc.json; do not edit.\n// Regenerate: bun run generate:commands",
       $refOptions: { resolve: { file: false, http: false } },
       enableConstEnums: false,
       unknownAny: true,
     },
   );
   return `import type { Result } from "@forge-ahead/errors";\n${output}
+export const commandNames = ${JSON.stringify(document.methods.map((method) => method.name))} as const;
 export type CommandName = keyof Commands;
 export type HandlerMap<Context, Failure> = {
   [M in CommandName]: (

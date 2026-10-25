@@ -1,8 +1,8 @@
 import type { JSONRPCResponse } from "json-rpc-2.0";
 
-import type { Commands } from "./executor";
+import type { Commands } from "./generated/commands";
 
-export type { Commands } from "./executor";
+export type { Commands } from "./generated/commands";
 
 export type RpcRequest = {
   [M in keyof Commands]: {
