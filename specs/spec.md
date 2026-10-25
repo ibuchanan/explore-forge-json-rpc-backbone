@@ -2,25 +2,29 @@
 
 <!-- cspell:words pocock -->
 
-Status: draft for review, 2026-10-25. Audience: maintainers of
-`explore-forge-json-rpc-backbone`. This is the **only main implementation spec
-for this repository**. It replaces the original POC plan and architectural
-exploration; implemented behavior is documented in the reference and guides.
+Status: local decision gate concluded, 2026-10-25; trigger adoption remains unmet
+and live/second-consumer follow-ups remain separately gated. Audience:
+maintainers of `explore-forge-json-rpc-backbone`. This is the **only main
+implementation spec for this repository**. It replaces the original POC plan
+and architectural exploration; implemented behavior is documented in the
+reference and guides.
 It does not authorize live operations or claim production readiness.
 
 ## Problem Statement
 
-The app has demonstrated a shared configuration lifecycle through a Jira UI
+The original app demonstrated a shared configuration lifecycle through a Jira UI
 resolver and an authenticated JSON-RPC web trigger. An operator-reported run
-passed all 30 deployed HTTP checks. However, the current dispatcher combines
-application execution with JSON-RPC errors and envelopes. Types, method names,
-validation, and OpenRPC descriptions still have overlapping handwritten forms.
+passed all 30 deployed HTTP checks. That baseline motivated separating command
+execution from JSON-RPC framing and replacing overlapping handwritten contracts.
+Those local changes are now documented in the runtime reference; the historical
+HTTP pass does not verify them in a deployed installation.
 
 We want to learn whether commands can become a reusable application interface
 across Forge apps, with JSON-RPC as a standard deployed integration-testing
 surface. We must preserve the proven behavior without assuming that every
 trigger can execute every command, or that every actor has the same authority.
-Native result and retry translation remain the important unproven dimension.
+Local native result/retry translation is demonstrated, but actual delivery,
+trigger-library runtime adoption and cross-app reuse remain unproven.
 
 ## Solution
 
@@ -194,10 +198,19 @@ operator-reported 2026-10-25 HTTP pass and its limits; the
 [SecretSpec validation record](secretspec-validation.md) is historical tooling
 V&V, not another implementation plan.
 
-The [trigger-library outbound spec](outbound/forge-ahead-triggers.md) owns native
-contracts and outcome translation. The [commands-library seed spec](outbound/forge-ahead-commands.md)
-owns reusable command execution, the first-class JSON-RPC adapter, and generation.
-These are handoff drafts, not accepted changes in their target repositories.
+The [local extraction decision](command-architecture-decision.md) records fresh
+checks and keep/change/defer conclusions: keep the proven seams locally, defer
+package extraction, and retain actual trigger adoption as unmet. Optional live
+re-verification and one second consumer require their own targets and approvals.
+It is dated evidence, not a replacement plan or claim of production acceptance.
+
+The trigger handoff moved to
+`forge-ahead-triggers/specs/explore-forge-json-rpc-backbone-feedback.md`.
+That repository owns native contracts/helpers; apps own outcome/retry policy.
+The decision record holds the proposed consumer delta without editing the peer.
+The [commands-library seed spec](outbound/forge-ahead-commands.md) describes
+possible reusable execution, first-class JSON-RPC adaptation and generation.
+Neither proposal is an accepted change in a target package.
 
 Issue publication and `ready-for-agent` labeling are deferred because no project
 tracker or triage vocabulary is configured. Run `/setup-matt-pocock-skills`

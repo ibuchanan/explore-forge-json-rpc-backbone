@@ -1,18 +1,21 @@
 # Seed spec: reusable commands with an OpenRPC testing surface
 
-<!-- cspell:words pocock -->
+<!-- cspell:words pocock openrpc -->
 
-Status: seed draft, 2026-10-25. Audience: prospective `forge-ahead-commands`
-maintainers. This proposes a new logical layer and possible package; it does
-not establish that a repository, published package, or stable API already exists.
+Status: evidence-backed seed draft, 2026-10-25. Audience: prospective
+`forge-ahead-commands` maintainers. The reference app now demonstrates the local
+seams below; [the extraction decision](../command-architecture-decision.md) keeps
+them in the app and defers package extraction/publication. This seed does not
+establish a repository, published package, or stable public interface.
 
 ## Problem Statement
 
 Forge apps repeat operation logic across UI, external HTTP, and background
 invocations, or force every invocation through a protocol-specific handler.
-The reference app proves that a shared dispatcher and deployed JSON-RPC endpoint
-can exercise persistence and validation without driving a browser. Its handlers
-still depend on JSON-RPC exceptions, and its contract has handwritten duplicates.
+The reference app now separates protocol-neutral handlers from JSON-RPC framing,
+consumes generated contracts, and validates successful output at runtime. Its
+historical deployed HTTP pass predates these changes; current local tests do not
+establish deployed acceptance or a reusable package interface.
 
 We need a small reusable command interface that preserves this testing advantage
 while allowing each native adapter to express its own output and delivery
@@ -30,6 +33,68 @@ Every registered command is addressable through the standard JSON-RPC test
 adapter. Execution is governed by explicit application policy. A documented
 forbidden response is coverage of denial, not coverage of successful execution.
 No automatic privileged testing principal is introduced.
+
+## Demonstrated consumer seams and remaining proposal
+
+The [dated decision record](../command-architecture-decision.md) identifies the
+revision, fresh checks, versions, coverage and unresolved acceptance. These are
+app interfaces, not promised exports from a commands package:
+
+- `execute(method, params, caller, store)` in `src/executor.ts` returns the
+  shared `Result<Output, CommandFailure>` for all four commands. Trusted caller
+  and injected store are separate from untrusted params. App authorization runs
+  before parameters/effects; reset validates confirmation before its UI-only
+  source restriction. The current `Caller` and `PrefixStore` are app-specific,
+  not proposed universal identity/storage contracts.
+- `createExecutor(handlers)` applies generated successful-output validators to
+  injected or real handlers. Invalid output and unexpected exceptions become
+  sanitized semantic `internal`, even after persistence. It neither retries nor
+  rolls back; read-back remains a separate command. Production failures are
+  `forbidden`, `method-not-found`, `invalid-params`, `not-configured`, `internal`.
+- `dispatch(payload, caller, store)` in `src/commands.ts` is the first-class
+  JSON-RPC adapter used by HTTP and Bridge. It owns envelope validation, fixed
+  numeric error mapping and safe response-ready observation, not credentials or
+  universal execution permission. Envelope validation precedes authorization and
+  method lookup; no fallback or second execution path remains.
+- `docs/reference/openrpc.json` owns names, named params and result schemas.
+  Build-time `scripts/command-contracts.ts` and `scripts/generate-commands.ts`
+  produce `src/generated/commands.ts` and `commands.validators.js`. Real
+  handlers, registration, typed frontend caller and verifier fixtures consume
+  `Commands`, `commandNames`, `HandlerMap` and `TypedCaller`. No business stubs
+  are generated. Development guidance owns regeneration/check procedures.
+- The accepted type strategy is bounded traversal plus
+  `json-schema-to-typescript` 16.0.0, with Ajv 8.20.0 standalone output validators.
+  Both compilers remain dev dependencies. Biome formats deterministic artifacts;
+  the read-only drift check covers both. Stock `@open-rpc/typings` 1.13.1 was
+  rejected as generator after runnable compile comparisons, not adopted.
+- Supported schemas cover named objects, empty objects, string/boolean/null,
+  nullable type arrays, properties/required/boolean additional properties,
+  enum/const, titles/descriptions and string lengths. Only local component
+  references resolve; collisions, unsupported features and missing/external
+  references fail. No file/HTTP schema fetching occurs.
+- Input normalization, strict fields, Unicode code-point limits, exact preview
+  text and permission policy remain handwritten. Generated output validation
+  runs before success and does not infer side-effect safety. Neither static
+  types nor schema presence grants authority or proves runtime behavior.
+- `test/native/product-event.ts` proves one complete local product-event binding
+  with injected policy, not a library interface or installed consumer. Explicit
+  fixture `transient`/`write-uncertain` classifications are not production
+  failures or deductions from RPC codes. SDK retry values and terminal or
+  reconciliation dispositions belong to native adaptation; retry permission,
+  repeat safety and reliable reconciliation remain app responsibilities.
+
+**Extraction constraint:** keep these seams in the app until another bounded
+consumer demonstrates a stable unmet need. Any proposed package should own
+execution and JSON-RPC framing, reuse shared errors/logging, and keep build-time
+generation separate. Triggers own verified native contracts/helpers; apps own
+bindings, authority, normalization and retry policy. Structural types and app
+composition require no mandatory cross-library runtime cycle. Actual trigger
+runtime adoption is still unmet; its deferred compatibility result is not a
+satisfied package acceptance criterion. No generic registry framework, new
+failure taxonomy, generated CLI or public package is delivered by this seed.
+
+The stories and decisions below describe proposed extraction requirements.
+They must not be read as additional implemented package behavior.
 
 ## User Stories
 
@@ -88,10 +153,11 @@ No automatic privileged testing principal is introduced.
   need stable discriminators and public-safe messages; do not require HTTP
   Problem Details or numeric JSON-RPC codes in the core. Reuse existing error
   forms where compatible without making an HTTP status the domain discriminator.
-- **Execute once through one interface.** Resolve name, validate/normalize input,
-  apply application authorization, execute the handler, validate successful output,
-  and observe sanitized outcome. Precisely define validation/authorization order
-  and fail closed without side effects; apps needing the current POC's error
+- **Execute once through one interface.** Apply application authorization,
+  resolve the command, validate/normalize input, execute the handler, validate
+  successful output, and observe sanitized outcome. Precisely define validation
+  and authorization order and fail closed without side effects; apps needing the
+  current POC's error
   precedence must retain it through their adapter. Do not add a dependency
   container, middleware framework, or internal network call to execute a handler.
 - **Inject context and dependencies.** The application supplies verified actor,
@@ -120,13 +186,14 @@ No automatic privileged testing principal is introduced.
   helpers. Optional scaffold generation must not overwrite manual handlers and
   must fail explicitly until implemented. Do not generate authorization, retry
   policy, business effects, or native manifest modules from examples.
-- **Evaluate existing tooling.** First test `@open-rpc/typings` for schema and
-  method aliases. Its individual-argument signatures need adaptation to named
-  objects and `Result`. `@open-rpc/schema-utils-js` can validate/dereference
-  documents. A small OpenRPC traversal plus `json-schema-to-typescript` is an
-  alternative; do not write a schema compiler. The broader OpenRPC generator's
-  server scaffold is not a Forge runtime and needs custom templates for dotted
-  method names. Tool choice remains an experiment, not an installed dependency.
+- **Use the demonstrated tooling choice.** The executed
+  [generation experiment](../openrpc-generation-experiment.md) chose bounded
+  OpenRPC traversal plus `json-schema-to-typescript`, and rejected stock
+  `@open-rpc/typings` as the generator. Standalone Ajv output adds runtime
+  result validation without deploying a schema compiler. Broader OpenRPC
+  generators and schema utilities remain unused alternatives, not necessary
+  dependencies or accepted Forge scaffolds. Do not reopen this choice without
+  a concrete unsupported consumer requirement and reproducible comparison.
 - **Define the generation profile explicitly.** Resolve references reproducibly;
   preserve dotted wire names while escaping identifiers and rejecting collisions.
   Support required/optional fields, empty objects, nullable results, literal
@@ -193,10 +260,13 @@ No automatic privileged testing principal is introduced.
 
 ## Further Notes
 
-The [reference-app spec](../spec.md) owns the extraction experiment and backward
-compatibility proof. The [trigger outbound spec](forge-ahead-triggers.md) owns
-native contracts and outcome mapping. Dependency direction must stay acyclic;
-shared structural executor interfaces need not force a runtime dependency.
+The [reference-app spec](../spec.md) owns remaining app work. The
+[extraction decision](../command-architecture-decision.md) records local evidence
+and the unapplied delta for the trigger handoff, whose owning source moved to
+`forge-ahead-triggers/specs/explore-forge-json-rpc-backbone-feedback.md`.
+That repository owns native contracts and helpers; apps own outcome policy.
+Dependency direction must stay acyclic; shared structural executor types need
+not force a runtime dependency.
 
 Tooling sources checked during planning:
 
@@ -209,10 +279,11 @@ Tooling sources checked during planning:
 - [JSON Schema to TypeScript](https://github.com/bcherny/json-schema-to-typescript):
   schema-to-type generation, not runtime validation or authorization.
 
-These tools were inspected during planning, not proven against this app's
-contract by an executed generation experiment. Pin versions and evaluate Forge
-bundle compatibility before adoption. Do not equate the potential generated
-surface with an accepted package API.
+The selected and rejected tooling paths now have executed compiler fixtures;
+the broader generator/schema-utility sources above remain planning references.
+Exact versions and current local checks are in the dated decision record.
+Forge deployment bundling, live adoption and a stable package interface are
+not established by the generated surface or the local size check.
 
 Issue publication and `ready-for-agent` labeling remain deferred until project
 setup via `/setup-matt-pocock-skills`; this is a local seed spec only.

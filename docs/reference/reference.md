@@ -301,6 +301,8 @@ and the [JSON-RPC proof guide](../how-to/prove-json-rpc.md) for procedures.
 - [OpenRPC contract](openrpc.json): all four commands, including reset denial.
 - [JSON-RPC adapter](../../src/commands.ts) and [neutral executor](../../src/executor.ts):
   current dispatch and execution boundaries.
+- [Extraction decision](../../specs/command-architecture-decision.md): dated local
+  checks, keep/change/defer conclusions, and unapplied trigger-handoff delta.
 - [Deployed V&V record](../../specs/deployed-poc-verification.md): operator-reported
   HTTP pass; installed UI, isolation, and backend-log acceptance remain separate.
 - [Historical tooling V&V](../../specs/secretspec-validation.md): original

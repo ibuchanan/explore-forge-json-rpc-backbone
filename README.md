@@ -70,9 +70,10 @@ not yet grant it. Do not infer live acceptance from local mocks.
 - [Runtime reference](docs/reference/reference.md) — command, protocol,
   authorization, storage, and logging facts.
 - [Main spec](specs/spec.md) — this repo's remaining proof work and test criteria.
-- [Trigger-library handoff](specs/outbound/forge-ahead-triggers.md) and
-  [Commands-library seed](specs/outbound/forge-ahead-commands.md) — outbound drafts,
-  not implemented package capabilities.
+- [Extraction decision](specs/command-architecture-decision.md) — local evidence,
+  deferred trigger adoption, and the delta for the moved trigger-library handoff.
+- [Commands-library seed](specs/outbound/forge-ahead-commands.md) — demonstrated
+  seams and proposed package scope, not implemented package capabilities.
 - [Forge app configuration](DEVELOPMENT.md#configure-this-repositorys-variables)
   — this app's requirements and links to shared SecretSpec and Fence Rider docs.
 - [Development](DEVELOPMENT.md) — checks and repository layout.

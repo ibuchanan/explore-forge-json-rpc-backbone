@@ -55,14 +55,14 @@ and named parameters. Batches, notifications, positional parameters, and null ID
 are deliberately rejected. A JSON-RPC ID correlates responses; it is not an
 idempotency key or a background-job completion mechanism.
 
-## Why the next extraction separates outcomes from envelopes
+## Why execution is separate from envelopes
 
 All four commands now return shared application `Result` values through a small
 neutral executor. The JSON-RPC adapter selects numeric errors and envelopes for
 both existing entry points. Keeping trusted context and storage separate from
 parameters preserves authorization without coupling handlers to a Forge request
-or RPC exception. Command types now come from OpenRPC; runtime validation and
-application policy remain handwritten.
+or RPC exception. Command types and successful-output validators now come from
+OpenRPC; input normalization, validation and application policy remain handwritten.
 
 Migrating reads first and mutations second preserved a working baseline without
 leaving a permanent second execution path. Reset policy stays in the app-owned
@@ -101,16 +101,20 @@ fixtures. A stale artifact fails the check-only workflow; after regeneration,
 a new command cannot compile until its app-owned handler is implemented.
 
 Generation supplies contracts and names, not handler bodies or authority.
-Implementations, runtime validation, and authorization stay handwritten. Prefix
-normalization illustrates the limit: length is validated after trimming, so
+Implementations, input normalization/validation, and authorization stay
+handwritten; successful-output validation is generated. Prefix normalization
+illustrates the limit: length is validated after trimming, so
 blind validation of raw input can change behavior despite matching a schema.
 Generated types cannot enforce runtime length or resource authorization.
 
-The outbound [commands seed spec](../../specs/outbound/forge-ahead-commands.md)
-keeps the proposed executor/JSON-RPC tooling separate from the
-[trigger handoff](../../specs/outbound/forge-ahead-triggers.md), which owns native
-completion and adaptation. The separation is a proposal to test locally first,
-not a claim that either library already implements it.
+The [extraction decision](../../specs/command-architecture-decision.md) keeps
+these demonstrated seams in the app and defers package extraction. The outbound
+[commands seed](../../specs/outbound/forge-ahead-commands.md) describes a possible
+commands library, not an accepted package interface. Trigger contracts/helpers
+belong to the separate trigger repository; apps retain command selection,
+authority and retry policy. The decision record retains an unapplied delta for
+the moved trigger handoff. Its exact response/type incompatibilities remain
+visible rather than being hidden by a decorative import or a compensating wrapper.
 
 ## What remains outside command integration coverage
 

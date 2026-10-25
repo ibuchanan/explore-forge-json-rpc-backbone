@@ -301,6 +301,13 @@ npm run check
 npm run lint:docs
 ```
 
+If formatting races with a generator's temporary validator artifact, run the
+same pipeline serially; do not skip checks or accept generated drift:
+
+```sh
+bun run check -- --max-parallel 1
+```
+
 Shared tooling validation is documented upstream. This app no longer includes
 `scripts/check-secretspec.sh`; do not run that removed local command.
 
@@ -312,7 +319,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution process.
 - `src/`: TypeScript source code.
 - `docs/`: Diataxis guides, reference, explanations, and tutorials.
 - `specs/spec.md`: The single main spec for this repo's remaining proof work.
-- `specs/outbound/`: Draft handoffs for the trigger and proposed command libraries.
+- `specs/outbound/`: Proposed commands-library seed. The trigger handoff moved to
+  the trigger repository; its unapplied consumer delta is in the local decision
+  record.
 - Other `specs/` records: Dated V&V evidence, not competing implementation plans.
   Specs are excluded from Biome checks; validate their Markdown separately.
 - `GLOSSARY.md`: Shared command, trigger, outcome, and adapter vocabulary.
