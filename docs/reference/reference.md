@@ -236,15 +236,41 @@ The manifest uses Node.js 24, ESM source, and `storage:app`/`read:jira-work` sco
 Backend records use `@forge-ahead/logging`, named `config-rpc`. Every shared RPC
 has `rpc.invoke`/`rpc.complete`, a generated `invocationId`, safe method/source,
 outcome, elapsed milliseconds, and an RPC error code when applicable.
-`@forge-ahead/logging/demo` adds a two-step `rpc-lifecycle` narrative per call.
-HTTP guard failures log `http.reject`; absent runtime credentials log
-`RUNTIME_SECRET_MISSING` with `http.authenticate` and status 503.
+`disposition=response-ready` means the adapter has constructed a response, not
+that HTTP/Bridge delivery was observed. Rejected calls retain invocation and
+completion records. `@forge-ahead/logging/demo` adds a two-step `rpc-lifecycle`
+narrative per call. HTTP guard failures log `http.reject`; absent runtime
+credentials log `RUNTIME_SECRET_MISSING` with `http.authenticate` and status 503.
+
+The local product-event fixture uses that same logger, not an installed native
+handler. Each call has `native.invoke`/`native.complete`, a generated
+`invocationId`, fixed `source=product-event`, `adapter=jira.issue-created`, and
+`method=integration.preview`. Its three-step `native-lifecycle` narrative records
+validation, semantic outcome, and adapter completion intent separately. Step
+numbers restart per invocation, including overlapping calls. Completion includes
+`outcome`, `disposition`, and elapsed milliseconds:
+
+| Outcome                                                             | Disposition                                                   | Completion level |
+| ------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------- |
+| `succeeded`                                                         | `acknowledged`                                                | `info`           |
+| `forbidden`, `invalid-params`, `method-not-found`, `not-configured` | `terminal`                                                    | `warn`           |
+| `transient`                                                         | `retry-requested` or `terminal`, according to existing policy | `warn`           |
+| `internal`                                                          | `terminal`                                                    | `error`          |
+| `write-uncertain`                                                   | `reconciliation-required`                                     | `error`          |
+
+These are allowlisted fixture classifications, not values inferred from arbitrary
+exceptions or JSON-RPC codes. Normal handler completion does not establish command
+success. A retry intent is not observed scheduling; reconciliation-required does
+not perform reconciliation or establish rollback. Output values are not serialized
+for observation. Production execution and native completion policy are unchanged.
 
 The opt-in verifier logs a numbered `deployed-verification` narrative to stderr
 and a sanitized JSON report to stdout, sharing a generated local `runId`.
-That ID is not sent to the backend. Info-level records honor logger level
-configuration. Logs omit parameters, preview/prefix values, client IDs,
-credentials, URLs, account IDs, and raw exception details.
+That ID is not sent to the backend and is not automatically correlated with
+backend invocation IDs. Local logger capture is not deployed backend-log
+inspection. Info-level records honor logger level configuration. Logs omit
+parameters, preview/prefix values, client IDs, credentials, URLs, account IDs,
+and raw exception details.
 
 The deployed suite requires a development Jira target and initially unset prefix.
 It checks read-only readiness before state/write tests, stops on the first

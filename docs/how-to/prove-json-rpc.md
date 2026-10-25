@@ -421,7 +421,9 @@ Numbering restarts for each run.
 
 `name=config-rpc` records each shared RPC as `operation=rpc.invoke`, followed by
 `operation=rpc.complete` with outcome, elapsed milliseconds, and `rpcCode` on
-errors. Filter by server-generated `invocationId` to group a single call.
+errors. Treat `disposition=response-ready` as response construction, not proof
+that the caller received it. Filter by server-generated `invocationId` to group
+a single call.
 `source=api` identifies HTTP callers; `source=ui` identifies the resolver path
 after its admin permission check. Its `storyId=rpc-lifecycle` narrative explains
 reads, saves, previews, resets, and rejections. Step numbers restart for each
@@ -430,6 +432,27 @@ invocation, not each container. HTTP requests rejected before dispatch log
 credentials log the separate `RUNTIME_SECRET_MISSING` diagnostic.
 These requests never invoke an RPC.
 
+#### Inspect the local native contract narrative
+
+Run `bun run test -- test/native-outcomes.test.ts` for the local product-event
+contract proof. Tests capture the existing logger in memory and assert its
+narrative; they do not invoke a deployed native handler or inspect backend logs.
+Consult the [metadata reference](../reference/reference.md#logging-and-deployed-verification)
+when interpreting a captured record.
+
+Group `native.invoke`/`native.complete` and the three `native-lifecycle` steps
+by their generated `invocationId`, not the issue or installation identity.
+Read `outcome` separately from `disposition`. A terminal acknowledgement may
+accompany denial or failure; a resolved handler is not command success.
+
+Treat `retry-requested` as a returned native retry request, not evidence of
+scheduling or delivery. Treat `reconciliation-required` as a stop requiring
+investigation, not performed reconciliation or rollback. Do not repeat writes
+automatically.
+
+This fixture is not manifest-wired. Leave native delivery and deployed log
+acceptance unverified until separately approved and observed.
+
 #### Levels, correlation, and safe evidence
 
 Keep the local narrative at `info` level or more verbose. The logger honors
@@ -437,7 +460,9 @@ Keep the local narrative at `info` level or more verbose. The logger honors
 info-level narrative/invocation records. Configure backend levels through the
 approved runtime-variable workflow if needed. Default logging includes info.
 The local `runId` is not sent to the backend; group backend records by Forge
-invocation/time and `invocationId`, not by an assumed shared run ID.
+invocation/time and `invocationId`, not by an assumed shared run ID. Local
+captures are not backend-log inspection and do not automatically correlate these
+IDs.
 
 For a clean report file, redirect the command's stdout to your approved evidence
 location and leave stderr visible. JSON narrative records remain on stderr;

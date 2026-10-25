@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import type { Result } from "@forge-ahead/errors";
+import { createDemoNarrative } from "@forge-ahead/logging/demo";
 import type { InvocationContext } from "@forge-ahead/triggers";
 import { InvocationError, InvocationErrorCode } from "@forge/events";
 import type { Caller, CommandFailure } from "../../src/executor";
 import type { Commands } from "../../src/generated/commands";
+import { logger } from "../../src/logging";
 
 /** Explicit fixture outcomes, not inferred from production `internal` or RPC codes. */
 export type Failure = CommandFailure | "transient" | "write-uncertain";
@@ -34,9 +37,59 @@ export function createIssueCreatedHandler(options: Options) {
     event: unknown,
     context: InvocationContext,
   ): Promise<undefined | InvocationError> => {
+    const log = logger.child({
+      invocationId: randomUUID(),
+      source: "product-event",
+      adapter: "jira.issue-created",
+      method: "integration.preview",
+    });
+    const story = createDemoNarrative(log, { storyId: "native-lifecycle" });
+    const started = performance.now();
+    log.info({ operation: "native.invoke" }, "Native handler invoked");
+    story.step(
+      "Validate the event binding and trusted caller before executing preview.",
+    );
+    const record: Options["record"] = (entry) => {
+      story.step(
+        entry.outcome === "succeeded"
+          ? "Command succeeded; output is omitted."
+          : entry.outcome === "transient"
+            ? "Command failed transiently; repeat safety and retry permission are explicit app policy."
+            : entry.outcome === "write-uncertain"
+              ? "Write outcome is uncertain; persistence or rollback is not established."
+              : entry.outcome === "internal"
+                ? "Invocation failed internally; command success is not established and details are omitted."
+                : "Command denied or rejected; no successful output is available.",
+      );
+      story.step(
+        entry.disposition === "acknowledged"
+          ? "Acknowledge native delivery; no command output is returned."
+          : entry.disposition === "retry-requested"
+            ? "Return a native retry request; retry scheduling and delivery are not observed."
+            : entry.disposition === "reconciliation-required"
+              ? "Stop automatic repetition; reconciliation is required, not performed."
+              : "Acknowledge with terminal disposition; normal completion is not command success.",
+      );
+      log[
+        entry.outcome === "internal" || entry.outcome === "write-uncertain"
+          ? "error"
+          : entry.outcome === "succeeded"
+            ? "info"
+            : "warn"
+      ](
+        {
+          operation: "native.complete",
+          outcome: entry.outcome,
+          disposition: entry.disposition,
+          elapsedMs: performance.now() - started,
+        },
+        "Native adapter completion intent selected",
+      );
+      options.record(entry);
+    };
     try {
       if (options.authorize(context) !== true) {
-        options.record({ outcome: "forbidden", disposition: "terminal" });
+        record({ outcome: "forbidden", disposition: "terminal" });
         return undefined;
       }
       const candidate = event as {
@@ -49,7 +102,7 @@ export function createIssueCreatedHandler(options: Options) {
         candidate?.eventType !== "avi:jira:created:issue" ||
         typeof text !== "string"
       ) {
-        options.record({ outcome: "invalid-params", disposition: "terminal" });
+        record({ outcome: "invalid-params", disposition: "terminal" });
         return undefined;
       }
       const result = await options.execute(
@@ -72,18 +125,18 @@ export function createIssueCreatedHandler(options: Options) {
             typeof retry?.retryReason === "string"));
       return result.match(
         () => {
-          options.record({ outcome: "succeeded", disposition: "acknowledged" });
+          record({ outcome: "succeeded", disposition: "acknowledged" });
           return undefined;
         },
         (outcome) => {
           if (outcome === "transient" && canRetry) {
-            options.record({ outcome, disposition: "retry-requested" });
+            record({ outcome, disposition: "retry-requested" });
             return new InvocationError({
               retryAfter: 30,
               retryReason: InvocationErrorCode.FUNCTION_RETRY_REQUEST,
             });
           }
-          options.record({
+          record({
             outcome,
             disposition:
               outcome === "write-uncertain"
@@ -94,7 +147,7 @@ export function createIssueCreatedHandler(options: Options) {
         },
       );
     } catch {
-      options.record({ outcome: "internal", disposition: "terminal" });
+      record({ outcome: "internal", disposition: "terminal" });
       return undefined;
     }
   };

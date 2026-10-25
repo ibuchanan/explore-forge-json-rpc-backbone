@@ -72,10 +72,14 @@ never derives a retry from an RPC code. JSON-RPC IDs are not deduplication keys.
 Terminal and uncertain paths resolve normally instead of throwing or returning
 an ordinary `Result`/RPC error. The record callback receives only allowlisted
 outcome/disposition names, no input, output, identity, URL, or exception detail.
-It models an app-owned disposition sink; it is not durable reconciliation or the
-logging integration owned by ticket 09. That sink must be reliable before live
-adoption. No blanket claim about Forge's treatment of arbitrary thrown app errors
-is needed: caught app errors are sanitized and acknowledged here. Platform
+It models an app-owned disposition sink, not durable reconciliation. The local
+fixture now also uses the existing app logger and demo narrative to record semantic
+outcome separately from native completion intent; the
+[runtime reference](../docs/reference/reference.md#logging-and-deployed-verification)
+describes this observation contract. Neither local capture nor the callback proves
+deployed log inspection or durable reconciliation. The sink must be reliable before
+live adoption. No blanket claim about Forge's treatment of arbitrary thrown app
+errors is needed: caught app errors are sanitized and acknowledged here. Platform
 failures can still cause automatic redelivery, independently of this app policy;
 this proof cannot guarantee exactly-once execution or suppress platform retries.
 

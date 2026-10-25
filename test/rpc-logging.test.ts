@@ -47,6 +47,9 @@ it("logs every API and UI invocation with independent demo steps and sanitized o
     expect(invocations).toHaveLength(10);
     expect(completions).toHaveLength(10);
     expect(
+      completions.every((record) => record["disposition"] === "response-ready"),
+    ).toBe(true);
+    expect(
       new Set(invocations.map((record) => record["invocationId"])).size,
     ).toBe(10);
     expect(completions.map((record) => record["rpcCode"] ?? "success")).toEqual(

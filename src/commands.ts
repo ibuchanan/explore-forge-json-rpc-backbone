@@ -131,6 +131,7 @@ export async function dispatch(
     log[code === -32603 ? "error" : code === undefined ? "info" : "warn"](
       {
         operation: "rpc.complete",
+        disposition: "response-ready",
         outcome:
           code === undefined
             ? "succeeded"
