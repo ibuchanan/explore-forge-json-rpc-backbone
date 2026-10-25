@@ -8,6 +8,15 @@ modules:
   function:
     - key: rpc
       handler: index.run
+    - key: config-resolver
+      handler: resolver.handler
+  jira:adminPage:
+    - key: config-admin
+      resource: config-ui
+      render: native
+      resolver:
+        function: config-resolver
+      title: JSON-RPC configuration
 app:
   runtime:
     name: nodejs24.x
@@ -17,3 +26,7 @@ app:
 permissions:
   scopes:
     - storage:app
+    - read:jira-work
+resources:
+  - key: config-ui
+    path: src/frontend/index.tsx

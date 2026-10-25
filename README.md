@@ -12,13 +12,13 @@ without duplicating behavior or conflating their security models? This is a
 Forge app repository, not an installable JSON-RPC service or a published npm
 package (`package.json` marks it private).
 
-**Current state:** `manifest.yml` declares two v2 dynamic-response web
-triggers. Their handlers in `src/index.ts` return `{"hello": "world"}` and a
-random `X-Request-Id`; the asynchronous handler delays its response. There is
-no UI, command dispatcher, JSON-RPC protocol, product API operation, or
-implemented authentication. Web trigger URLs are public and these handlers
-accept unauthenticated requests. Do not use this code to process sensitive
-input or assume it is production-ready.
+**Current state:** A UI Kit Jira admin page and one authenticated v2 web trigger
+share `config.get`, `config.set`, and `integration.preview` through the same
+JSON-RPC dispatcher and installation-scoped KVS store. The UI resolver checks
+Jira `ADMINISTER` permission on every call; HTTP uses a separately provisioned
+bearer secret. Preview only concatenates the saved prefix and supplied text.
+Local tests pass; deployed HTTP and installed-UI acceptance remain unverified.
+This is a proof of concept, not production-ready integration software.
 
 ## Try the repository locally
 
@@ -30,23 +30,21 @@ npm ci
 npm run test
 ```
 
-The Vitest script currently allows an empty test suite, so a passing run
-only confirms that the test runner starts; it does **not** verify the handlers
-or transport parity. `npm run check` is the broader pre-push gate, but the
-current checkout has existing source type errors and formatting failures.
+Vitest covers the command contract, HTTP boundary, resolver authorization,
+shared storage, and UI behavior without a browser or deployed app.
+`npm run check` is the broader pre-push gate, including Forge lint.
 Deploying or installing is a separate, opt-in Forge operation; see
 [development guidance](DEVELOPMENT.md) and the `forge:*` scripts in
 `package.json` for this repository's environment-targeted workflow. Do not
 register a new app identity just to inspect this checkout.
 
-## Proposed direction
+## Next verification
 
-The [POC spec](specs/spec.md) proposes a single, read-only `text.analyze`
-command invoked through a Custom UI resolver and an authenticated web trigger.
-Both adapters would pass requests to one dispatcher; each would establish its
-own trusted caller context. The spec narrows the earlier JSON-RPC blueprint to
-a single-request subset and calls for local **and** deployed UI/HTTP checks.
-None of that proposed behavior is available in the current handlers.
+The [POC spec](specs/spec.md) requires local **and** deployed UI/HTTP evidence.
+The [installed-UI journey](docs/how-to/how-to.md#verify-the-installed-admin-page)
+covers save, reload, preview, and error checks after separate deployment and
+installation approval. The new `read:jira-work` scope requires an installation
+upgrade. Do not infer live acceptance from local mocks.
 
 ## Read more
 

@@ -3,20 +3,19 @@
 This repository explores a command-oriented architecture for a Forge app. In
 this design, a command is a named request for an operation with explicit input
 and a result. It is not a shell command or necessarily a class implementing the
-Gang of Four Command pattern. The proposed `text.analyze` command, for example,
-would accept text and return counts. A dispatcher would interpret a request,
-validate its input, select the command, and return a serializable result or
+Gang of Four Command pattern. The `integration.preview` command, for example,
+concatenates a saved prefix and supplied text. A dispatcher interprets a request,
+validates its input, selects the command, and returns a serializable result or
 error. That dispatcher is the shared seam; it is not another public endpoint.
 
-Today the repository does **not** implement that seam. The manifest wires two
-web triggers to hello-world handlers in `src/index.ts`. There is no UI,
-resolver, command dispatcher, or JSON-RPC API yet. The
-[proof-of-concept spec](../../specs/spec.md) describes the next experiment,
-not the current behavior.
+The manifest wires a UI Kit Jira admin page through a Forge resolver and an
+authenticated web trigger to that seam. Both use the same KVS adapter. Local
+tests exercise both paths; the [proof-of-concept spec](../../specs/spec.md)
+still requires separate deployed HTTP and installed-UI evidence.
 
 ## Why put a command in the middle?
 
-Forge entry points have different shapes. A Custom UI would call a backend
+Forge entry points have different shapes. A UI Kit page calls a backend
 resolver through Forge Bridge, while an external client would call a web
 trigger over HTTP. If each adapter contains its own operation logic, the same
 behavior can drift across entry points and can only be tested through those
@@ -52,7 +51,7 @@ template.
 Local tests can show that one command behaves consistently for chosen inputs;
 they cannot prove that manifest wiring, Forge Bridge, HTTP authentication, or
 an installed UI works. Those still need deployed checks. Two adapters also
-cost more to secure and maintain than one. The POC uses one deterministic,
-read-only command to assess whether the shared seam earns that cost before
-adding product API operations, a registry generator, or a CLI. If it does not,
-a resolver-only command module is simpler.
+cost more to secure and maintain than one. The POC uses two configuration
+commands and a deterministic preview to assess whether the seam earns that
+cost before adding product API operations, a registry generator, or a CLI. If it
+does not, a resolver-only command module is simpler.
