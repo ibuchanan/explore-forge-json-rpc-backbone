@@ -244,6 +244,46 @@ that configuration, an authorized administrator can use **Configure > Reset
 configuration**, then explicitly rerun the verifier; a completed suite leaves
 `poc-😀` saved. No reset or additional live request was performed by the assistant.
 
+## Ticket 11 operator-reported HTTP pass, 2026-10-25
+
+The operator supplied the complete report and narrative from a subsequent explicit
+`bun run test:deployed`, captured as `tmp_rovo_after-reset-report.json`. All
+**30 checks passed**, exit code **0**, in **12393.710958 ms**.
+
+| Field | Reported evidence |
+| --- | --- |
+| Run ID | `a7713063-53d3-409d-856a-eeb5f66a4070` |
+| Started at | `2026-10-25T23:03:07.543Z` |
+| Endpoint handling | Stored URL reused; no Forge lookup reported |
+| Initial state | Unset configuration verified; earlier saved-state prerequisite cleared |
+| Final demonstrated state | `poc-😀` saved, read back, and preserved after denied HTTP reset |
+| Configuration risk | `configurationMayHaveChanged: true`; save and persistence positively verified, not rolled back |
+| Source context | Local HEAD at evidence recording: `010c62733be477c25f8f24023b9bb542e8331adc`; only documentation changed since `c989664` |
+| Deployment identity | Exact deployed revision, installation identity and tunnel state not established by the report |
+
+| Command | Authenticated HTTP evidence | UI-admin evidence |
+| --- | --- | --- |
+| `config.get` | Successful execution verified | Unverified |
+| `config.set` | Successful execution verified | Unverified |
+| `config.reset` | Denial verified; saved configuration preserved | Unverified |
+| `integration.preview` | Successful execution verified | Unverified |
+
+The pass also covers four authorization rejection cases, method/media/body limits,
+JSON-RPC envelope and parameter rejection, preview before setup, exact/empty/
+Unicode-boundary previews and the over-limit rejection. Deployed readiness took
+1499.279 ms; save took 317.609250 ms; persisted read took 327.045750 ms; reset
+denial took 324.742417 ms. The 62 narrative steps are local runner output, not
+independent deployed backend-log evidence.
+
+This clears the HTTP-suite blocker, not all ticket 11 acceptance. The report
+proves the initial unset state but does not independently demonstrate the Admin
+UI reset flow. Installed three-screen UI, UI-admin execution, deployed backend-log
+inspection, isolation and native delivery/retry scheduling remain unverified.
+Earlier failure records and the historical pass remain separately dated evidence.
+The assistant made no runtime changes, new tests, automatic retry, reset or live
+request while recording this report. No further HTTP rerun is needed for this
+evidence; another full run requires unset configuration.
+
 ## Live acceptance evidence
 
 Statuses below reflect the dated operator-supplied report, not an independent
