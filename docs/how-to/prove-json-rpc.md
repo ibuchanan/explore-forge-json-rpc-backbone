@@ -31,8 +31,7 @@ It does not change Jira issues or call a third-party API.
   `FORGE_SITE`, `FORGE_PRODUCT`, and `FORGE_ENVIRONMENT` controls.
   Bind `project_secrets` to an approved backend
   with project/profile isolation for `RPC_BEARER_SECRET`.
-  Bind `project_config` to writable isolated non-secret storage for URLs
-  and the test-write acknowledgement.
+  Bind `project_config` to writable isolated non-secret storage for URLs.
   Aliases belong in user-global `[defaults.providers]`.
 - Use `npm run forge:deploy`,
   then `npm run forge:upgrade` for an existing installation
@@ -363,7 +362,7 @@ The optional second installation must also be approved and have no saved prefix.
 1. Review the SecretSpec target and
    [configure deployed verification](../../DEVELOPMENT.md#configure-deployed-verification).
    The selected profile must resolve development, Jira, a nonempty site,
-   the existing bearer credential, and the stored test-write acknowledgement.
+   and the existing bearer credential.
    Confirm the stored primary URL belongs to that installation independently;
    upsert trusts an available URL. The verifier still rejects URL syntax with
    embedded credentials, query parameters, or fragments before HTTP calls.
@@ -379,14 +378,16 @@ The optional second installation must also be approved and have no saved prefix.
 
    The package script resolves the full profile through SecretSpec itself.
    Do not wrap it in another `secretspec run` or hand-export target/token values.
-   [`test-deployed.sh`](../../scripts/test-deployed.sh) checks the stored
-   development acknowledgement and Jira target before any URL creation,
-   runs the URL upsert, and passes its URL to the verifier in the same process.
+   [`test-deployed.sh`](../../scripts/test-deployed.sh) checks the development
+   Jira target before any URL creation, runs the URL upsert, and passes its URL
+   to the verifier in the same process.
    No second invocation or shell export is needed when a URL was just saved.
    This command can create/store a missing URL, makes live HTTP calls,
    and attempts a test write; it does not deploy, install, or upload runtime values.
-   The acknowledgement records operator intent; it does not grant permission
-   or prove that the configured URL belongs to the approved target.
+   Running this command explicitly starts the write-capable suite;
+   no separate approval setting is required. It leaves `poc-😀` saved without
+   automatically resetting or restoring configuration. Target controls alone
+   do not prove that the stored URL belongs to the intended installation.
 
 4. Save the sanitized JSON report in the approved evidence location.
    Exit 0 means the HTTP suite passed;
@@ -400,6 +401,57 @@ The optional second installation must also be approved and have no saved prefix.
    The suite does not restore or reset configuration. After recording comparisons,
    use the confirmed Admin UI reset before another full run if approved.
    Record its actual observations before proceeding with any other test writes.
+
+### Follow the verification narrative
+
+Follow two separate log streams. The local narrative works from this checkout;
+backend records require deploying this version first.
+
+#### Local verifier stderr
+
+`@forge-ahead/logging/demo` emits numbered `kind=demoNarrativeStep`,
+`demoOnly=true` records with `storyId=deployed-verification`
+and `name=deployed-verifier`. The fresh `runId` also appears in the JSON report.
+Each named check logs its start and pass/failure, including expected rejection
+tests. The final step reports success/failure, possible configuration changes,
+and isolation; UI verification remains a separate task.
+Numbering restarts for each run.
+
+#### Forge backend logs
+
+`name=config-rpc` records each shared RPC as `operation=rpc.invoke`, followed by
+`operation=rpc.complete` with outcome, elapsed milliseconds, and `rpcCode` on
+errors. Filter by server-generated `invocationId` to group a single call.
+`source=api` identifies HTTP callers; `source=ui` identifies the resolver path
+after its admin permission check. Its `storyId=rpc-lifecycle` narrative explains
+reads, saves, previews, resets, and rejections. Step numbers restart for each
+invocation, not each container. HTTP requests rejected before dispatch log
+`operation=http.reject` and the status (401/405/415/413); missing runtime
+credentials log the separate `RUNTIME_SECRET_MISSING` diagnostic.
+These requests never invoke an RPC.
+
+#### Levels, correlation, and safe evidence
+
+Keep the local narrative at `info` level or more verbose. The logger honors
+`LOG_LEVEL`, including named overrides; `warn`, `error`, or `silent` suppress
+info-level narrative/invocation records. Configure backend levels through the
+approved runtime-variable workflow if needed. Default logging includes info.
+The local `runId` is not sent to the backend; group backend records by Forge
+invocation/time and `invocationId`, not by an assumed shared run ID.
+
+For a clean report file, redirect the command's stdout to your approved evidence
+location and leave stderr visible. JSON narrative records remain on stderr;
+stdout from the verifier contains only the report. Package-runner banners may
+also appear when using npm, so extract the report separately if your tooling
+requires a single JSON document from the whole npm command.
+
+Logs contain only known method names (others become `unknown`), static messages,
+safe status/error codes, and generated correlation IDs. Client JSON-RPC IDs,
+parameters, saved prefixes, preview text/output, account IDs, credentials,
+headers, URLs, and raw exception details are deliberately omitted. Expected
+negative probes produce warning/rejection records; judge the suite by its
+check result, not by the mere presence of warnings in backend logs.
+A save-completed record is not a read-back assertion or a rollback guarantee.
 
 ### Check what the runner actually proved
 
@@ -422,6 +474,12 @@ passing that test is not live acceptance.
 
 #### Boundary and lifecycle checks
 
+- Local `preflight` validates SecretSpec inputs without network calls.
+- `deployed readiness` makes an authenticated, read-only `config.get` request,
+  confirming the endpoint returns the expected JSON-RPC configuration shape.
+  It distinguishes the app's missing-runtime-secret 503 and rejected-token 401
+  responses from generic HTTP, contract, and transport failures. It does not
+  prove installation identity or inspect Forge's encrypted variable store.
 - Unset configuration before attempting writes,
   and an optional second installation's initial unset state.
 - Absent, incorrect, malformed, and combined duplicate credentials (HTTP 401);
@@ -456,7 +514,8 @@ Read these report fields before declaring success:
 | Field                         | Meaning                                                                           |
 | ----------------------------- | --------------------------------------------------------------------------------- |
 | `status` and `checks`         | Overall result and each attempted named check, with elapsed milliseconds.         |
-| `checks[].message`            | Static guidance on a failed preflight setting; never its supplied value.          |
+| `checks[].message`            | Static failure guidance for local settings, deployed readiness, or a named check. |
+| `runId`                       | Generated identifier shared with this run's local narrative records.              |
 | `startedAt` / `elapsedMs`     | Run timestamp and total measured duration.                                        |
 | `configurationMayHaveChanged` | True once a save is attempted, even if its reply fails. Not a rollback guarantee. |
 | `isolation`                   | Verified only if the optional second-installation checks pass.                    |
@@ -485,7 +544,7 @@ record target metadata separately without the full trigger URL.
 ### Diagnose by boundary
 
 - **Setup failed before a JSON report:** read the script's static stderr guidance.
-  Correct SecretSpec provider/target/acknowledgement resolution, Forge authentication,
+  Correct SecretSpec provider/target resolution, Forge authentication,
   or `project_config` write access as indicated. If Forge obtained a URL but storage
   failed, fix the provider then rerun; Forge returns the same context's URL.
   Neither the app verifier nor its test writes ran.
@@ -497,12 +556,35 @@ record target metadata separately without the full trigger URL.
   isolation checks. Never print the secret to diagnose it. The report's
   `configurationMayHaveChanged` is false;
   earlier URL setup is not an app-config write.
-- **`config.get unset` failed:** preflight passed and the first HTTP read did not
-  match the expected unset response. If the UI has a saved prefix, this is the
-  expected initial-state failure. Confirm target and authentication too; the
-  sanitized report does not expose the response. With test-reset approval, reset
-  through Configure, wait for read-back confirmation, and retry before saving.
-  This check occurs before the verifier's writes, not before its HTTP calls.
+- **`deployed readiness` failed:** local preflight passed, but the authenticated
+  read did not establish a usable deployed app. Read the static `message`:
+  - The app's exact HTTP 503 `Service Unavailable` signature means its active
+    runtime has no `RPC_BEARER_SECRET`. Local SecretSpec resolution is not an
+    upload. With approval, run `npm run forge:variables:set`, then
+    `npm run forge:deploy` for the same development environment. Upload the
+    existing credential; do not generate another token just to fix activation.
+    After deploying the logging change in this checkout, inspect backend invocation
+    logs for `name=config-rpc` and `errorCode=RUNTIME_SECRET_MISSING` when an
+    otherwise valid HTTP request returns this 503. The `@forge-ahead/logging`
+    error record also includes `operation=http.authenticate`,
+    `setting=RPC_BEARER_SECRET`, and `statusCode=503`. Its static message
+    names the remedy without recording credentials, headers, request bodies,
+    or trigger URLs.
+    Earlier versions returned this handled response silently; an HTTP 503 alone
+    does not cause an automatic application error log. Absence of this message in
+    an older deployment does not establish that the variable is present.
+  - The app's exact HTTP 401 `Unauthorized` signature means the endpoint rejected
+    the supplied credential. Check the saved URL and matching local/deployed
+    credential before any upload, rotation, or reset.
+  - Other HTTP responses, malformed JSON-RPC, oversized/exposing responses, or
+    transport failures receive generic static guidance, not raw response data.
+  - `second installation readiness` applies the same read-only checks to the
+    optional isolation target before any test write.
+- **`config.get unset` failed:** deployed readiness passed and its already-read
+  response contains a saved prefix. With permission to discard it, reset through
+  Configure, wait for read-back confirmation, and retry before saving.
+  The two checks share one read; this check makes no additional HTTP request.
+  It occurs before the verifier's writes, but after its first HTTP call.
 - HTTP 401: the bearer credential is absent, invalid, malformed, or duplicated.
 - HTTP 503: the runtime secret is missing. Follow approved provisioning;
   do not print it or rotate it as a speculative fix.

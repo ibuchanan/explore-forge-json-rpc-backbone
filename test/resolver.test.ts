@@ -18,6 +18,7 @@ vi.mock("@forge/kvs", () => ({
 
 import { run } from "../src/index";
 import { handler } from "../src/resolver";
+import { logRecords } from "./logging";
 
 const payload = (method: string, params: object = {}) => ({
   jsonrpc: "2.0",
@@ -100,6 +101,20 @@ it("uses the official resolver and shares read, save and preview commands and KV
     "/rest/api/3/mypermissions?permissions=ADMINISTER",
   );
   expect(mocks.asUser.mock.calls.every((args) => args.length === 0)).toBe(true);
+  const invocations = logRecords().filter(
+    (record) => record["operation"] === "rpc.invoke",
+  );
+  expect(invocations.some((record) => record["source"] === "ui")).toBe(true);
+  expect(invocations.some((record) => record["source"] === "api")).toBe(true);
+  for (const sensitive of [
+    "trusted-admin",
+    "ui-request",
+    "test-secret",
+    "changed hi",
+    "😀",
+  ]) {
+    expect(JSON.stringify(logRecords())).not.toContain(sensitive);
+  }
 });
 
 it("resets only the prefix after an as-user admin permission check and supports reconfiguration", async () => {

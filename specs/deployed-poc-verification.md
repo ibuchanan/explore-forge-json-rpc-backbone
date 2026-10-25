@@ -24,6 +24,9 @@ site is not approval to use that site.
 
 ## Local evidence
 
+This section records the original 2026-10-24 behavior and check results;
+see the dated updates below for the current workflow.
+
 - `test/deployed/verify.ts` implements the opt-in HTTP sequence. The actual runner
   is `test/deployed/run.ts`, invoked only by `bun run test:deployed`; it is not
   a Vitest test and ordinary repository checks never call it.
@@ -61,6 +64,28 @@ reset approved test configuration through the UI before repeating the full suite
 These are implementation changes, not a new live acceptance claim. Follow the
 [Admin UI reset guide](../docs/how-to/prove-admin-ui.md#reset-demo-configuration-for-another-verification-run)
 for the current repeat-run procedure; the earlier evidence above remains historical.
+
+## Explicit test invocation replaces the approval latch, 2026-10-25
+
+The local scripts and verifier no longer require a persisted approval value.
+Running `test:deployed` explicitly starts the suite. SecretSpec still supplies
+the target, URLs, and bearer credential; development-only and Jira-only guards
+remain, as do URL validation, authentication checks, refusal of existing demo
+configuration, and sanitized reports. A successful run still leaves `poc-😀`
+saved without automatic reset or restoration. This changes local tooling only,
+not the deployed app, and is not a new live acceptance claim.
+
+## Read-only deployed readiness added 2026-10-25
+
+Local `preflight` still validates inputs without HTTP calls. The runner now
+reports an authenticated `deployed readiness` read separately from the unset-state
+check, reusing the same response rather than adding a request. The app's exact
+missing-runtime-secret 503 and rejected-credential 401 signatures receive static
+corrective guidance. Other failures remain sanitized. The optional second target
+uses the same readiness check before test writes. A saved prefix passes readiness
+but fails the subsequent unset check with manual reset guidance. No automatic
+upload, deployment, credential rotation, or reset was added. This is local
+implementation evidence, not a new live acceptance claim.
 
 ## Live acceptance evidence
 

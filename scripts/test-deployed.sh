@@ -2,10 +2,9 @@
 set -eu
 
 # Refuse before URL creation as well as before the verifier's own HTTP preflight.
-if [ "${RPC_VERIFY_APPROVED-}" != development ] ||
-   [ "${FORGE_ENVIRONMENT-}" != development ] ||
+if [ "${FORGE_ENVIRONMENT-}" != development ] ||
    [ "${FORGE_PRODUCT-}" != jira ]; then
-  echo "Deployed verification requires SecretSpec RPC_VERIFY_APPROVED=development, FORGE_ENVIRONMENT=development, and FORGE_PRODUCT=jira. No Forge or HTTP calls were made." >&2
+  echo "Deployed verification requires SecretSpec FORGE_ENVIRONMENT=development and FORGE_PRODUCT=jira. No Forge or HTTP calls were made." >&2
   exit 1
 fi
 

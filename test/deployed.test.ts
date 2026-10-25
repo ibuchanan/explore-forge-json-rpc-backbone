@@ -1,12 +1,13 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { handleHttp } from "../src/http";
 import { verifyDeployed } from "./deployed/verify";
+import { logRecords } from "./logging";
 
 const secret = "local-verifier-test-credential";
 const primary = "https://primary.example.test/rpc";
 const secondary = "https://secondary.example.test/rpc";
 const environment = {
-  RPC_VERIFY_APPROVED: "development",
   FORGE_ENVIRONMENT: "development",
   FORGE_PRODUCT: "jira",
   FORGE_SITE: "isolated.example.test",
@@ -56,16 +57,43 @@ function transport(initialPrefix?: string) {
 }
 
 describe("opt-in deployed HTTP verifier (local adapter only)", () => {
+  it("keeps real narrative output on stderr and the JSON report alone on stdout", () => {
+    const run = spawnSync("bun", ["run", "-"], {
+      input: `
+          import { verifyDeployed } from "./test/deployed/verify.ts";
+          const report = await verifyDeployed({}, async () => { throw new Error("must not call HTTP"); });
+          console.log(JSON.stringify(report));
+        `,
+      encoding: "utf8",
+      env: { ...process.env, LOG_LEVEL: "info", FORGE_LOG_PRETTY: "false" },
+    });
+    expect(run.status).toBe(0);
+    const report = JSON.parse(run.stdout);
+    expect(report.status).toBe("failed");
+    const records = run.stderr
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(
+      records.every(
+        (record) =>
+          record.name === "deployed-verifier" && record.runId === report.runId,
+      ),
+    ).toBe(true);
+    const steps = records.filter(
+      (record) => record.kind === "demoNarrativeStep",
+    );
+    expect(steps.map((record) => record.stepNumber)).toEqual([1, 2, 3, 4]);
+    expect(steps[2].msg).toBe("Check failed: preflight");
+    expect(steps[3].msg).toBe("Verification failed; UI remains unverified.");
+    expect(records.some((record) => record.level === "error")).toBe(true);
+  });
   it("emits actionable preflight diagnostics for each condition", async () => {
     const fetcher = vi.fn();
     const cases: Array<[Record<string, string | undefined>, string]> = [
       [
-        { RPC_VERIFY_APPROVED: undefined },
-        "RPC_VERIFY_APPROVED must be development",
-      ],
-      [
-        { RPC_VERIFY_APPROVED: "true" },
-        "RPC_VERIFY_APPROVED must be development",
+        { FORGE_ENVIRONMENT: undefined },
+        "FORGE_ENVIRONMENT must be development",
       ],
       [
         { FORGE_ENVIRONMENT: "production" },
@@ -176,12 +204,13 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("fails closed without explicit approval and valid development settings", async () => {
+  it("fails closed without valid development Jira settings", async () => {
     const fetcher = vi.fn();
     for (const overrides of [
-      { RPC_VERIFY_APPROVED: undefined },
-      { RPC_VERIFY_APPROVED: "true" },
+      { FORGE_ENVIRONMENT: undefined },
       { FORGE_ENVIRONMENT: "production" },
+      { FORGE_ENVIRONMENT: "staging" },
+      { FORGE_PRODUCT: undefined },
       { FORGE_PRODUCT: "confluence" },
       { FORGE_SITE: "" },
       { RPC_BEARER_SECRET: undefined },
@@ -234,8 +263,45 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
         status: "passed",
       }),
     );
-    const output = JSON.stringify(report);
-    for (const sensitive of [secret, primary, secondary, "Authorization"]) {
+    const narrative = logRecords().filter(
+      (record) => record["storyId"] === "deployed-verification",
+    );
+    expect(narrative.map((record) => record["stepNumber"])).toEqual(
+      narrative.map((_, index) => index + 1),
+    );
+    expect(
+      narrative.every(
+        (record) =>
+          record["runId"] === report.runId && record["demoOnly"] === true,
+      ),
+    ).toBe(true);
+    expect(narrative.slice(1, -1).map((record) => record["msg"])).toEqual(
+      report.checks.flatMap(({ name }) => [
+        `Check started: ${name}`,
+        `Check passed: ${name}`,
+      ]),
+    );
+    expect(narrative.at(-1)?.["msg"]).toBe(
+      "Verification passed; UI remains unverified.",
+    );
+    expect(
+      narrative.some((record) =>
+        String(record["msg"]).includes("config.set save"),
+      ),
+    ).toBe(true);
+    expect(
+      logRecords()
+        .filter((record) => record["operation"] === "http.reject")
+        .map((record) => record["statusCode"]),
+    ).toEqual([401, 401, 401, 401, 405, 415, 413]);
+    const output = JSON.stringify([report, logRecords()]);
+    for (const sensitive of [
+      secret,
+      primary,
+      secondary,
+      "Authorization",
+      "poc-😀",
+    ]) {
       expect(output).not.toContain(sensitive);
     }
 
@@ -264,11 +330,133 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
     expect(report.isolation).toBe("unverified");
   });
 
+  it("reports deployment readiness failures before checking configuration or writing", async () => {
+    const cases = [
+      [
+        503,
+        "Service Unavailable",
+        "text/plain",
+        "runtime RPC_BEARER_SECRET is missing",
+      ],
+      [
+        401,
+        "Unauthorized",
+        "text/plain",
+        "deployed endpoint rejected RPC_BEARER_SECRET",
+      ],
+      [
+        503,
+        "<html>proxy unavailable</html>",
+        "text/html",
+        "Unexpected HTTP response",
+      ],
+      [404, "Not Found", "text/plain", "Unexpected HTTP response"],
+    ] as const;
+    for (const [status, body, media, guidance] of cases) {
+      const fetcher = vi.fn(
+        async () =>
+          new Response(body, {
+            status,
+            headers: { "Content-Type": media },
+          }),
+      );
+      const report = await verifyDeployed(environment, fetcher);
+      expect(report.checks.map(({ name }) => name)).toEqual([
+        "preflight",
+        "deployed readiness",
+      ]);
+      expect(report.checks.at(-1)).toMatchObject({
+        status: "failed",
+        message: expect.stringContaining(guidance),
+      });
+      expect(report.configurationMayHaveChanged).toBe(false);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(report)).not.toContain(secret);
+      expect(JSON.stringify(report)).not.toContain(primary);
+      if (status === 503 && media === "text/plain") {
+        expect(report.checks.at(-1)?.message).toContain(
+          "npm run forge:variables:set",
+        );
+        expect(report.checks.at(-1)?.message).toContain("npm run forge:deploy");
+      }
+    }
+  });
+
+  it("rejects malformed readiness envelopes without exposing returned values", async () => {
+    for (const value of [
+      { jsonrpc: "2.0", id: 1, result: { configured: false, prefix: null } },
+      {
+        jsonrpc: "2.0",
+        id: 0,
+        result: { configured: false, prefix: "private-prefix" },
+      },
+      {
+        jsonrpc: "2.0",
+        id: 0,
+        result: { configured: true, prefix: "x".repeat(65) },
+      },
+      {
+        jsonrpc: "2.0",
+        id: 0,
+        result: { configured: true, prefix: "private-prefix" },
+        extra: "private-detail",
+      },
+    ]) {
+      const fetcher = vi.fn(
+        async () =>
+          new Response(JSON.stringify(value), {
+            headers: { "Content-Type": "application/json" },
+          }),
+      );
+      const report = await verifyDeployed(environment, fetcher);
+      expect(report.checks.at(-1)).toMatchObject({
+        name: "deployed readiness",
+        status: "failed",
+        message: expect.stringContaining("JSON-RPC contract"),
+      });
+      expect(report.configurationMayHaveChanged).toBe(false);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(report)).not.toContain("private-");
+    }
+  });
+
+  it("checks optional second-installation readiness before any write", async () => {
+    const { fetcher: adapter, prefixes } = transport();
+    const fetcher = vi.fn((url: string, init: RequestInit) =>
+      url === secondary
+        ? Promise.resolve(
+            new Response("Unauthorized", {
+              status: 401,
+              headers: { "Content-Type": "text/plain" },
+            }),
+          )
+        : adapter(url, init),
+    );
+    const report = await verifyDeployed(
+      { ...environment, RPC_VERIFY_ISOLATION_URL: secondary },
+      fetcher,
+    );
+    expect(report.checks.at(-1)).toMatchObject({
+      name: "second installation readiness",
+      status: "failed",
+      message: expect.stringContaining("rejected RPC_BEARER_SECRET"),
+    });
+    expect(report.configurationMayHaveChanged).toBe(false);
+    expect(prefixes.size).toBe(0);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("refuses configured installations before attempting any writes", async () => {
     const { fetcher, prefixes } = transport("existing setup");
     const report = await verifyDeployed(environment, fetcher);
     expect(report.status).toBe("failed");
-    expect(report.checks.at(-1)?.name).toBe("config.get unset");
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({ name: "deployed readiness", status: "passed" }),
+    );
+    expect(report.checks.at(-1)).toMatchObject({
+      name: "config.get unset",
+      message: expect.stringContaining("already saved"),
+    });
     expect(report.configurationMayHaveChanged).toBe(false);
     expect(prefixes.get(primary)).toBe("existing setup");
     expect(fetcher.mock.calls).toHaveLength(1);
@@ -297,7 +485,11 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
     ]) {
       const report = await verifyDeployed(environment, fetcher);
       expect(report.status).toBe("failed");
-      expect(report.checks.at(-1)?.status).toBe("failed");
+      expect(report.checks.at(-1)).toMatchObject({
+        name: "deployed readiness",
+        status: "failed",
+        message: expect.any(String),
+      });
       expect(JSON.stringify(report)).not.toContain(secret);
       expect(JSON.stringify(report)).not.toContain(primary);
       expect(fetcher.mock.calls).toHaveLength(1);

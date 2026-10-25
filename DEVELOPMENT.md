@@ -26,7 +26,6 @@ Do not put credential values in the declaration or commit them anywhere.
 | `RPC_BEARER_SECRET`        | `project_secrets` | Required bearer token for this app's web trigger              |
 | `RPC_VERIFY_URL`           | `project_config`  | Primary URL saved by upsert; defaults to empty                |
 | `RPC_VERIFY_ISOLATION_URL` | `project_config`  | Optional read-only second installation URL; defaults to empty |
-| `RPC_VERIFY_APPROVED`      | `project_config`  | Test-write acknowledgement; defaults to `not-approved`        |
 
 Only `RPC_BEARER_SECRET` belongs to `[scopes.runtime]`. The `FORGE_*` controls
 are never uploaded. This app has no `manifest` scope. A SecretSpec profile is
@@ -167,20 +166,11 @@ isolate profiles by itself. Never store `RPC_BEARER_SECRET` in this config backe
 Shared alias definitions remain in the operator's global SecretSpec configuration,
 not the committed project declaration.
 
-The verifier's inputs now live in SecretSpec, not shell assignments. The URL fields
-are optional and default to empty. With approval for the selected isolated
-**development Jira** installation and its test writes, record the acknowledgement:
-
-```sh
-secretspec set --provider project_config --profile default RPC_VERIFY_APPROVED development
-```
-
-This persists intent for repeat runs; it is not an authorization grant. Review the
-selected target each time. Revoke the acknowledgement when finished:
-
-```sh
-secretspec set --provider project_config --profile default RPC_VERIFY_APPROVED not-approved
-```
+The verifier's inputs live in SecretSpec, not shell assignments. The URL fields
+are optional and default to empty. Review the selected isolated **development Jira**
+installation before each run. Running `test:deployed` explicitly starts the live
+suite, which requires no saved demo prefix and leaves `poc-😀` saved.
+There is no separate approval setting and no automatic reset or restoration.
 
 After deployment and installation, use:
 
@@ -196,8 +186,19 @@ without a Forge lookup. When absent, upsert obtains it through
 `forge webtrigger create` and saves it through `project_config` using stdin.
 A URL obtained this way is usable immediately in the same test run. Setup messages
 omit the URL, and a setup failure prevents the HTTP suite from starting.
+The verifier separates local `preflight` from authenticated, read-only
+`deployed readiness`. A local credential does not prove it is active in Forge:
+the app's missing-secret 503 reports the upload/deploy steps instead of
+mislabeling the failure as saved configuration. No provisioning runs automatically.
 `SECRETSPEC_FILE` and `SECRETSPEC_PROFILE` apply to both resolution and persistence;
 no value flags or ambient target overrides are needed.
+
+The verifier emits a numbered `@forge-ahead/logging/demo` narrative to stderr
+and the sanitized JSON report to stdout. Both include a fresh `runId`.
+Backend RPC invocation/outcome logs use the shared `config-rpc` logger, with
+per-call generated IDs and no parameter values. Follow the
+[logging guidance](docs/how-to/prove-json-rpc.md#follow-the-verification-narrative)
+to distinguish local check results, backend rejections, and uncertain writes.
 
 When switching installation or environment, deliberately clear the stored URL
 before upsert; it does not automatically invalidate cached values:
@@ -236,7 +237,7 @@ SECRETSPEC_PROFILE=default bun run fence-rider doctor --resolve
 ```
 
 These commands may access the provider or request authentication. Expect all
-seven declarations in the full-profile report and only `RPC_BEARER_SECRET` in
+six declarations in the full-profile report and only `RPC_BEARER_SECRET` in
 the runtime report. Even `lint:check:forge` resolves required runtime values;
 fix a missing token rather than weakening the declaration or bypassing the wrapper.
 Do not use `get`, `export`, or environment dumps to debug real secret values.

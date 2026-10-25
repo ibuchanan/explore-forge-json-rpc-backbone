@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { createForgeLogger } from "@forge-ahead/logging";
+import { createDemoNarrative } from "@forge-ahead/logging/demo";
 
 type Environment = Record<string, string | undefined>;
 type Transport = (url: string, init: RequestInit) => Promise<Response>;
@@ -50,7 +53,24 @@ function endpoint(value: string | undefined): string {
 // inject the HTTP adapter; the opt-in entry point supplies the real fetch.
 export async function verifyDeployed(env: Environment, send: Transport) {
   const started = performance.now();
+  const runId = randomUUID();
+  // Keep the machine-readable report alone on stdout.
+  const logger = createForgeLogger(
+    { name: "deployed-verifier", base: { runId } },
+    {
+      write: (chunk) => {
+        process.stderr.write(chunk);
+      },
+    },
+  );
+  const story = createDemoNarrative(logger, {
+    storyId: "deployed-verification",
+  });
+  story.step(
+    "Start deployed verification: read readiness, reject unsafe requests, save, read back, and preview. No automatic reset or retry.",
+  );
   const report = {
+    runId,
     startedAt: new Date().toISOString(),
     status: "failed" as "passed" | "failed",
     elapsedMs: 0,
@@ -65,6 +85,7 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     messageSupplier?: () => string | undefined,
   ) {
     const start = performance.now();
+    story.step(`Check started: ${name}`);
     try {
       await action();
       report.checks.push({
@@ -72,6 +93,7 @@ export async function verifyDeployed(env: Environment, send: Transport) {
         status: "passed",
         elapsedMs: performance.now() - start,
       });
+      story.step(`Check passed: ${name}`);
     } catch {
       const message = messageSupplier?.();
       report.checks.push({
@@ -80,6 +102,11 @@ export async function verifyDeployed(env: Environment, send: Transport) {
         elapsedMs: performance.now() - start,
         ...(message && { message }),
       });
+      story.step(`Check failed: ${name}`, { guidance: message });
+      logger.error(
+        { operation: "verification.check", check: name },
+        "Verification stopped at the first failed check",
+      );
       // Do not expose assertion diffs, fetch errors, URLs, headers, or bodies.
       throw new Error("Verification failed");
     }
@@ -94,12 +121,6 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     await check(
       "preflight",
       () => {
-        // RPC_VERIFY_APPROVED must be "development"
-        if (env["RPC_VERIFY_APPROVED"] !== "development") {
-          preflightMessage = "RPC_VERIFY_APPROVED must be development";
-          throw new Error();
-        }
-
         // FORGE_ENVIRONMENT must be "development"
         if (env["FORGE_ENVIRONMENT"] !== "development") {
           preflightMessage = "FORGE_ENVIRONMENT must be development";
@@ -167,70 +188,139 @@ export async function verifyDeployed(env: Environment, send: Transport) {
         method?: string;
         media?: string;
         auth?: string | null;
+        readiness?: boolean;
       } = {},
     ) {
-      await check(name, async () => {
-        const headers: Record<string, string> = {
-          "Content-Type": options.media ?? "application/json",
-        };
-        if (options.auth !== null)
-          headers["Authorization"] = options.auth ?? authorization;
-        const method = options.method ?? "POST";
-        const response = await send(options.url ?? url, {
-          method,
-          headers,
-          ...(method === "GET"
-            ? {}
-            : { body: typeof body === "string" ? body : JSON.stringify(body) }),
-          redirect: "error",
-          signal: AbortSignal.timeout(20_000),
-        });
-        const chunks: Uint8Array[] = [];
-        let bytes = 0;
-        const reader = response.body?.getReader();
-        if (reader) {
-          try {
-            while (true) {
-              const chunk = await reader.read();
-              if (chunk.done) break;
-              bytes += chunk.value.byteLength;
-              if (bytes > 32_768) throw new Error("Response too large");
-              chunks.push(chunk.value);
+      let received: unknown;
+      let diagnostic =
+        "Request failed or timed out; check endpoint connectivity and deployed logs without sharing raw output.";
+      await check(
+        name,
+        async () => {
+          const headers: Record<string, string> = {
+            "Content-Type": options.media ?? "application/json",
+          };
+          if (options.auth !== null)
+            headers["Authorization"] = options.auth ?? authorization;
+          const method = options.method ?? "POST";
+          const response = await send(options.url ?? url, {
+            method,
+            headers,
+            ...(method === "GET"
+              ? {}
+              : {
+                  body: typeof body === "string" ? body : JSON.stringify(body),
+                }),
+            redirect: "error",
+            signal: AbortSignal.timeout(20_000),
+          });
+          const chunks: Uint8Array[] = [];
+          let bytes = 0;
+          const reader = response.body?.getReader();
+          if (reader) {
+            try {
+              while (true) {
+                const chunk = await reader.read();
+                if (chunk.done) break;
+                bytes += chunk.value.byteLength;
+                if (bytes > 32_768) {
+                  diagnostic =
+                    "Response exceeded the 32 KiB limit; check the endpoint and deployed app.";
+                  throw new Error("Response too large");
+                }
+                chunks.push(chunk.value);
+              }
+            } finally {
+              await reader.cancel();
             }
-          } finally {
-            await reader.cancel();
           }
-        }
-        const text = Buffer.concat(chunks).toString("utf8");
-        const exposed = `${JSON.stringify([...response.headers])}\n${text}`;
-        if ([secret, invalidToken].some((token) => exposed.includes(token))) {
-          throw new Error("Credential exposure");
-        }
-        const media = response.headers.get("content-type") ?? "";
-        const validMedia =
-          typeof expected === "string"
-            ? /^text\/plain(?:\s*;|$)/i.test(media)
-            : /^application\/json(?:\s*;|$)/i.test(media);
-        if (
-          response.status !== (options.status ?? 200) ||
-          !validMedia ||
-          !isDeepStrictEqual(
-            typeof expected === "string" ? text : JSON.parse(text),
-            expected,
-          )
-        ) {
-          throw new Error("Response mismatch");
-        }
-      });
+          const text = Buffer.concat(chunks).toString("utf8");
+          const exposed = `${JSON.stringify([...response.headers])}\n${text}`;
+          if ([secret, invalidToken].some((token) => exposed.includes(token))) {
+            diagnostic =
+              "Response may expose a credential; stop and investigate privately before continuing.";
+            throw new Error("Credential exposure");
+          }
+          const media = response.headers.get("content-type") ?? "";
+          const plainMedia = /^text\/plain(?:\s*;|$)/i.test(media);
+          diagnostic =
+            "Unexpected HTTP response; check the saved URL, installation, and deployed logs.";
+          if (response.status !== (options.status ?? 200)) {
+            if (options.readiness && plainMedia) {
+              if (response.status === 503 && text === "Service Unavailable") {
+                diagnostic =
+                  "The app reports that runtime RPC_BEARER_SECRET is missing. With approval, run npm run forge:variables:set, then npm run forge:deploy for the same development environment; do not regenerate the credential.";
+              } else if (response.status === 401 && text === "Unauthorized") {
+                diagnostic =
+                  "The deployed endpoint rejected RPC_BEARER_SECRET. Verify the saved URL and matching local/deployed credential; do not rotate or overwrite it speculatively.";
+              }
+            }
+            throw new Error("Unexpected HTTP status");
+          }
+          const validMedia =
+            typeof expected === "string"
+              ? plainMedia
+              : /^application\/json(?:\s*;|$)/i.test(media);
+          if (!validMedia) throw new Error("Unexpected media type");
+          diagnostic =
+            "Response did not match the expected JSON-RPC contract; check the endpoint and deployed app version.";
+          received = typeof expected === "string" ? text : JSON.parse(text);
+          if (options.readiness) {
+            const config =
+              received && typeof received === "object" && "result" in received
+                ? received.result
+                : null;
+            const valid =
+              config &&
+              typeof config === "object" &&
+              "configured" in config &&
+              "prefix" in config &&
+              Object.keys(config).length === 2 &&
+              ((config.configured === false && config.prefix === null) ||
+                (config.configured === true &&
+                  typeof config.prefix === "string" &&
+                  config.prefix === config.prefix.trim() &&
+                  [...config.prefix].length >= 1 &&
+                  [...config.prefix].length <= 64)) &&
+              isDeepStrictEqual(received, result(0, config));
+            if (!valid) throw new Error("Invalid configuration response");
+          } else if (!isDeepStrictEqual(received, expected)) {
+            throw new Error("Response mismatch");
+          }
+        },
+        () => diagnostic,
+      );
+      return received;
     }
 
-    await probe("config.get unset", request("config.get"), result(0, unset));
+    const initial = await probe(
+      "deployed readiness",
+      request("config.get"),
+      undefined,
+      { readiness: true },
+    );
+    await check(
+      "config.get unset",
+      () => {
+        if (!isDeepStrictEqual(initial, result(0, unset))) throw new Error();
+      },
+      () =>
+        "A demo prefix is already saved. With permission to discard it, use Configure > Reset configuration, then rerun; the verifier never resets automatically.",
+    );
     if (isolationUrl) {
-      await probe(
-        "second installation unset before save",
+      const second = await probe(
+        "second installation readiness",
         request("config.get"),
-        result(0, unset),
-        { url: isolationUrl },
+        undefined,
+        { url: isolationUrl, readiness: true },
+      );
+      await check(
+        "second installation unset before save",
+        () => {
+          if (!isDeepStrictEqual(second, result(0, unset))) throw new Error();
+        },
+        () =>
+          "The second installation already has a saved prefix. Use an approved unset installation or omit the optional isolation URL; no automatic reset is performed.",
       );
     }
     for (const [name, auth] of [
@@ -358,5 +448,10 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     // The failed named check is sufficient evidence; raw exceptions are unsafe.
   }
   report.elapsedMs = performance.now() - started;
+  story.step(`Verification ${report.status}; UI remains unverified.`, {
+    configurationMayHaveChanged: report.configurationMayHaveChanged,
+    isolation: report.isolation,
+    checks: report.checks.length,
+  });
   return report;
 }

@@ -38,7 +38,6 @@ function fixture(native = false) {
     FAKE_SAVED: saved,
     FAKE_URL: url,
     RPC_VERIFY_URL: "https://ambient.example.test/do-not-use",
-    RPC_VERIFY_APPROVED: "development",
   };
   const tool = (name: string, body: string) =>
     writeFileSync(join(bin, name), `#!/bin/sh\nset -eu\n${body}\n`, {
@@ -52,7 +51,7 @@ case "$1" in
   run)
     [ "$2" = --scope ] && [ "$3" = '' ] && [ "$4" = -- ]
     shift 4
-    unset RPC_VERIFY_URL RPC_VERIFY_ISOLATION_URL RPC_VERIFY_APPROVED
+    unset RPC_VERIFY_URL RPC_VERIFY_ISOLATION_URL
     set -a
     . "$FAKE_VALUES"
     set +a
@@ -101,7 +100,6 @@ FORGE_SITE=example.atlassian.net
 FORGE_PRODUCT=jira
 FORGE_ENVIRONMENT=development
 RPC_BEARER_SECRET=synthetic-test-token
-RPC_VERIFY_APPROVED=development
 RPC_VERIFY_URL=''
 RPC_VERIFY_ISOLATION_URL=''
 ${extra}
@@ -158,11 +156,13 @@ describe("SecretSpec-backed operator scripts (fake Forge only)", () => {
     expect(result.stdout + result.stderr).not.toContain(url);
   });
 
-  it("requires persisted approval and a development Jira target before creating a URL", () => {
+  it("requires a development Jira target before creating a URL", () => {
     for (const extra of [
-      "RPC_VERIFY_APPROVED=not-approved",
       "FORGE_ENVIRONMENT=production",
+      "FORGE_ENVIRONMENT=staging",
+      "FORGE_ENVIRONMENT=''",
       "FORGE_PRODUCT=confluence",
+      "FORGE_PRODUCT=''",
       "FORGE_SITE='--invalid'",
     ]) {
       const f = fixture();
@@ -217,9 +217,6 @@ project_secrets = "dotenv:${f.values}"
       );
       f.env["SECRETSPEC_FILE"] = declaration;
       f.env["SECRETSPEC_PROFILE"] = "review";
-      expect(f.run("test:deployed").status).not.toBe(0);
-      expect(f.history()).toEqual([]);
-      writeFileSync(local, "RPC_VERIFY_APPROVED=development\n");
       const first = f.run("test:deployed");
       expect(first.status, first.stderr).toBe(0);
       expect(f.history()).toEqual(["forge", "verify"]);

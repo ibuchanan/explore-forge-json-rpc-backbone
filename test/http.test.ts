@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import type { PrefixStore } from "../src/commands";
 import { handleHttp } from "../src/http";
+import { logRecords } from "./logging";
 
 const request = (method: string, params: object = {}) => ({
   jsonrpc: "2.0",
@@ -223,17 +224,65 @@ describe("public web trigger boundary", () => {
     );
   });
 
-  it("rejects unconfigured credentials without dispatch", async () => {
-    const store = {
-      get: vi.fn(async () => undefined),
-      set: vi.fn(async () => {}),
-      reset: vi.fn(async () => {}),
-    };
-    expect((await handleHttp(makeEvent(), undefined, store)).statusCode).toBe(
-      503,
+  it.each([undefined, ""])(
+    "logs a structured runtime configuration error and rejects missing secret %j without dispatch",
+    async (runtimeSecret) => {
+      const store = {
+        get: vi.fn(async () => undefined),
+        set: vi.fn(async () => {}),
+        reset: vi.fn(async () => {}),
+      };
+      const response = await handleHttp(
+        makeEvent(
+          undefined,
+          JSON.stringify(
+            request("config.set", {
+              prefix: "private-prefix-must-not-be-logged",
+            }),
+          ),
+        ),
+        runtimeSecret,
+        store,
+      );
+      expect(response).toEqual({
+        statusCode: 503,
+        body: "Service Unavailable",
+        headers: { "Content-Type": ["text/plain; charset=utf-8"] },
+      });
+      expect(logRecords()).toEqual([
+        {
+          level: "error",
+          time: expect.any(Number),
+          name: "config-rpc",
+          operation: "http.authenticate",
+          errorCode: "RUNTIME_SECRET_MISSING",
+          setting: "RPC_BEARER_SECRET",
+          statusCode: 503,
+          msg: "RPC_BEARER_SECRET is missing or empty in the active Forge runtime. Provision the encrypted runtime variable and redeploy.",
+        },
+      ]);
+      const serialized = JSON.stringify(logRecords());
+      expect(serialized).not.toContain(secret);
+      expect(serialized).not.toContain("private-prefix-must-not-be-logged");
+      expect(store.get).not.toHaveBeenCalled();
+      expect(store.set).not.toHaveBeenCalled();
+      expect(store.reset).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not log a missing-variable error for successful or rejected authentication", async () => {
+    expect((await handleHttp(makeEvent(), secret, memory())).statusCode).toBe(
+      200,
     );
-    expect(store.get).not.toHaveBeenCalled();
-    expect(store.set).not.toHaveBeenCalled();
+    expect(
+      (await handleHttp(makeEvent(), "another-private-token", memory()))
+        .statusCode,
+    ).toBe(401);
+    expect(
+      logRecords().filter(
+        (record) => record["errorCode"] === "RUNTIME_SECRET_MISSING",
+      ),
+    ).toEqual([]);
   });
 
   it("enforces the inclusive 16 KiB body limit in UTF-8 bytes, not UTF-16 units", async () => {

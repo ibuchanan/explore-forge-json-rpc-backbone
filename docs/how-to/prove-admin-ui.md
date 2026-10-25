@@ -265,6 +265,14 @@ Use approved test inputs and safe failure injection only.
   Review the browser console and deployed backend logs with approved tooling;
   do not attach credentials, raw exceptions, or sensitive logs to the evidence.
 
+After deploying the logging changes, filter backend records by
+`name=config-rpc` and `source=ui`. Each RPC has an `rpc.invoke` record,
+an `rpc.complete` outcome, and a two-step `rpc-lifecycle` demo narrative.
+Group records by the generated `invocationId`; client IDs, account IDs,
+prefixes, preview values, and exception details are omitted.
+A save/reset completion is not the separate read-back verification.
+See [log streams and levels](prove-json-rpc.md#follow-the-verification-narrative).
+
 The corresponding local coverage is in [`ui.test.tsx`](../../test/ui.test.tsx),
 [`resolver.test.ts`](../../test/resolver.test.ts),
 and [`admin-wiring.test.tsx`](../../test/admin-wiring.test.tsx).
