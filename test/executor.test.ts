@@ -1,6 +1,6 @@
 import { err, ok } from "@forge-ahead/errors";
 import { expect, it, vi } from "vitest";
-import { execute, type PrefixStore } from "../src/executor";
+import { createExecutor, execute, type PrefixStore } from "../src/executor";
 
 it("reads empty and saved configuration as shared Results without RPC framing", async () => {
   for (const source of ["api", "ui"] as const) {
@@ -23,6 +23,119 @@ it("reads empty and saved configuration as shared Results without RPC framing", 
   }
 });
 
+it("rejects a malformed successful handler output as a semantic internal failure", async () => {
+  const store = {
+    get: vi.fn(async () => 7 as unknown as string),
+    set: vi.fn(),
+    reset: vi.fn(),
+  };
+  expect(
+    await execute("config.get", {}, { source: "api", authorized: true }, store),
+  ).toEqual(err("internal"));
+  expect(store.get).toHaveBeenCalledTimes(1);
+});
+
+it("rejects an invalid save output after persistence without rolling back or retrying", async () => {
+  const caller = { source: "ui" as const, authorized: true };
+  let saved: string | undefined;
+  const store = {
+    get: vi.fn(async () => saved),
+    set: vi.fn(async (prefix: string) => {
+      saved = prefix;
+    }),
+    reset: vi.fn(),
+  };
+  const run = createExecutor({
+    "config.get": async () => ok({ configured: true, prefix: saved ?? null }),
+    "config.set": async (_params, { store }) => {
+      await store.set("private-persisted");
+      return ok({ configured: false as unknown as true });
+    },
+    "config.reset": async () => ok({ configured: false }),
+    "integration.preview": async () => ok({ output: "" }),
+  });
+  expect(
+    await run("config.set", { prefix: "private-persisted" }, caller, store),
+  ).toEqual(err("internal"));
+  expect(store.set).toHaveBeenCalledExactlyOnceWith("private-persisted");
+  expect(store.get).not.toHaveBeenCalled();
+  expect(store.reset).not.toHaveBeenCalled();
+  expect(await execute("config.get", {}, caller, store)).toEqual(
+    ok({ configured: true, prefix: "private-persisted" }),
+  );
+});
+
+it("validates result shape, strict fields, literals and nullability independently of TypeScript", async () => {
+  for (const [method, values] of [
+    [
+      "config.get",
+      [
+        undefined,
+        null,
+        [],
+        {},
+        { configured: "private-true", prefix: null },
+        { configured: false },
+        { configured: true, prefix: 7 },
+        { configured: true, prefix: "private-prefix", extra: "private-extra" },
+      ],
+    ],
+    [
+      "config.set",
+      [
+        undefined,
+        null,
+        {},
+        { configured: false },
+        { configured: true, extra: "private-extra" },
+      ],
+    ],
+    [
+      "config.reset",
+      [
+        undefined,
+        null,
+        {},
+        { configured: true },
+        { configured: false, extra: "private-extra" },
+      ],
+    ],
+    [
+      "integration.preview",
+      [
+        undefined,
+        null,
+        {},
+        { output: null },
+        { output: 7 },
+        { output: "private-output", extra: "private-extra" },
+        { output: "😀".repeat(2065) },
+      ],
+    ],
+  ] as const) {
+    for (const value of values) {
+      const handler = async () => ok(value);
+      const run = createExecutor({
+        "config.get": handler,
+        "config.set": handler,
+        "config.reset": handler,
+        "integration.preview": handler,
+      } as unknown as Parameters<typeof createExecutor>[0]);
+      const store = { get: vi.fn(), set: vi.fn(), reset: vi.fn() };
+      const result = await run(
+        method,
+        {},
+        { source: "ui", authorized: true },
+        store,
+      );
+      expect(result, `${method}: ${JSON.stringify(value)}`).toEqual(
+        err("internal"),
+      );
+      expect(JSON.stringify(result)).not.toContain("private-");
+    }
+  }
+});
+
 it("previews exact text and Unicode boundaries or reports the configuration prerequisite", async () => {
   const caller = { source: "api" as const, authorized: true };
   const store = {
@@ -39,12 +152,13 @@ it("previews exact text and Unicode boundaries or reports the configuration prer
     [" hi\n", "😀 hi\n"],
     ["e\u0301", "😀e\u0301"],
     ["😀".repeat(2000), "😀".repeat(2001)],
+    ["e\u0301".repeat(1000), `😀${"e\u0301".repeat(1000)}`],
   ]) {
     expect(
       await execute("integration.preview", { text }, caller, store),
     ).toEqual(ok({ output }));
   }
-  expect(store.get).toHaveBeenCalledTimes(5);
+  expect(store.get).toHaveBeenCalledTimes(6);
   expect(store.set).not.toHaveBeenCalled();
   expect(store.reset).not.toHaveBeenCalled();
 });
@@ -90,6 +204,7 @@ it("saves a normalized prefix once for either authorized caller and reads it bac
   for (const source of ["api", "ui"] as const) {
     for (const [prefix, expected] of [
       ["  café 😀\n", "café 😀"],
+      [`${" ".repeat(100)}hi${" ".repeat(100)}`, "hi"],
       [` \t${"😀".repeat(64)}\n `, "😀".repeat(64)],
     ]) {
       let saved: string | undefined;

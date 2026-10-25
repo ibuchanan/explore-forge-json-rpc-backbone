@@ -1,3 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Ajv, { type AnySchema } from "ajv";
+import standaloneCode from "ajv/dist/standalone";
 import { compile } from "json-schema-to-typescript";
 
 // Build-time only: the app imports the generated contract, never this compiler.
@@ -51,6 +56,63 @@ function checkSchema(schema: Schema): void {
   }
   for (const property of Object.values(schema.properties ?? {}))
     checkSchema(property);
+}
+
+export function generateValidators(document: Document): string {
+  const ajv = new Ajv({
+    strict: true,
+    allowUnionTypes: true,
+    ownProperties: true,
+    messages: false,
+    logger: false,
+    code: { source: true, esm: true },
+  });
+  ajv.addKeyword("components");
+  // Ask Ajv for a boolean verdict, without generating unused error details.
+  ajv.addKeyword({
+    keyword: "outputContract",
+    schemaType: "object",
+    code(context) {
+      const valid = context.gen.name("valid");
+      context.subschema(
+        { keyword: "outputContract", createErrors: false },
+        valid,
+      );
+      context.gen.return(valid);
+    },
+  });
+  const exports = Object.fromEntries(
+    document.methods.map((method, index) => {
+      const id = `command-output:${index}`;
+      ajv.addSchema(
+        {
+          outputContract: method.result.schema,
+          components: { schemas: document.components?.schemas ?? {} },
+        } as AnySchema,
+        id,
+      );
+      return [`output${index}`, id];
+    }),
+  );
+  const source = `${standaloneCode(ajv, exports)}
+const outputValidators = {
+${document.methods.map((method, index) => `${JSON.stringify(method.name)}: output${index}`).join(",\n")}
+};
+export const validOutput = (method, value) => outputValidators[method](value);`;
+  // Bundle Ajv's small runtime helpers too, so no compiler or dev dependency is
+  // needed in Forge. Keep generated implementation out of handwritten TS checks.
+  const directory = mkdtempSync(resolve("tmp_rovo_validators_"));
+  try {
+    const input = resolve(directory, "validators.js");
+    writeFileSync(input, source);
+    return `// Generated from docs/reference/openrpc.json by Ajv; do not edit.\n// Regenerate: bun run generate:commands\n${execFileSync(
+      "bun",
+      ["build", input, "--target=browser", "--format=esm", "--minify"],
+      { encoding: "utf8" },
+    )}`;
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 export async function generate(document: Document): Promise<string> {

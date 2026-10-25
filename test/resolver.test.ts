@@ -117,6 +117,31 @@ it("uses the official resolver and shares read, save and preview commands and KV
   }
 });
 
+it("returns a sanitized UI internal error for invalid handler output before a success narrative", async () => {
+  mocks.get.mockResolvedValueOnce(7);
+  expect(await invoke(payload("config.get"))).toEqual({
+    jsonrpc: "2.0",
+    id: "ui-request",
+    error: { code: -32603, message: "Internal error" },
+  });
+  expect(
+    logRecords().filter((record) => record["operation"] === "rpc.complete"),
+  ).toEqual([
+    expect.objectContaining({
+      outcome: "failed",
+      rpcCode: -32603,
+      level: "error",
+    }),
+  ]);
+  expect(
+    logRecords().some((record) =>
+      String(record["msg"]).includes("Read saved configuration"),
+    ),
+  ).toBe(false);
+  expect(mocks.set).not.toHaveBeenCalled();
+  expect(mocks.delete).not.toHaveBeenCalled();
+});
+
 it("resets only the prefix after an as-user admin permission check and supports reconfiguration", async () => {
   mocks.data.set("unrelated.setting", "keep");
   await invoke(payload("config.set", { prefix: "to delete" }));

@@ -45,10 +45,11 @@ Empty string IDs are accepted. Batches, notifications, positional parameters,
 missing/null IDs, and client-supplied caller context are unsupported.
 
 A response contains `jsonrpc: "2.0"`, the valid request ID, and exactly one
-`result` or `error`. Parse failures and invalid IDs use `id: null`. Runtime
-checks are handwritten; OpenRPC schemas are validated in contract tests, not
-loaded to authorize each invocation. Command types and registered names are
-generated at build time from the catalog.
+`result` or `error`. Parse failures and invalid IDs use `id: null`. Envelope,
+parameter and authorization checks are handwritten. Successful handler outputs
+are validated by standalone functions generated from OpenRPC result schemas;
+the catalog does not grant authority. Command types and registered names are
+also generated at build time.
 
 | Code     | Message            | Meaning                                              |
 | -------- | ------------------ | ---------------------------------------------------- |
@@ -84,17 +85,25 @@ in `src/commands.ts` maps failures to the codes above and frames the response.
 Both HTTP and the UI resolver use that same adapter.
 
 Successful set/reset invokes the selected storage operation once, without an
-implicit read-back. An exception after persistence returns `internal`; it does
-not establish rollback, trigger a retry, or restore earlier configuration. A
-separate read observes the resulting state. Each command is registered once from
-generated `commandNames`, with no legacy handler path or fallback.
+implicit read-back. An exception or invalid output after persistence returns
+`internal`; neither establishes rollback, triggers a retry, nor restores earlier
+configuration. A separate read observes the resulting state. Output validation
+runs before returning success to an adapter or emitting its success narrative.
+Validation details and output values are neither returned nor logged; the existing
+internal-failure narrative warns that a write may be uncertain. Each command is
+registered once from generated `commandNames`, with no legacy handler path or fallback.
 
 ### Generated contract
 
 `docs/reference/openrpc.json` owns the catalog. The build-time traversal in
 `scripts/command-contracts.ts` delegates schema compilation to the dev dependency
 `json-schema-to-typescript` 16.0.0. `scripts/generate-commands.ts` formats output
-with the installed Biome version and owns the tracked `src/generated/commands.ts`.
+with the installed Biome version and owns the tracked `src/generated/commands.ts`
+and `src/generated/commands.validators.js`. The latter contains standalone Ajv
+8.20.0 output validators, including its small Unicode length helper bundled by
+Bun. Ajv remains a dev dependency; no runtime schema compiler or external module
+resolution is required by these validators. The same read-only drift check covers
+both artifacts.
 
 The artifact exports `Commands` (method-indexed named params and results), literal
 `commandNames`, `CommandName`, `HandlerMap<Context, Failure>`, and `TypedCaller`.
@@ -114,13 +123,15 @@ fail and file/HTTP resolvers are disabled. Unsupported keywords/types, positiona
 parameters, duplicate params, and conservatively normalized naming collisions
 fail generation. This is not a general schema compiler or remote resolver.
 
-Generated types do not validate untrusted data, enforce Unicode lengths, trim
-prefixes, preserve preview text, authorize callers, or validate successful outputs
-at runtime. Those parameter/policy checks remain in handwritten handlers;
-runtime output validation is still pending. No generated bodies or stubs exist.
-Neither generator nor schema compiler is imported by runtime source. The only
-runtime value in the artifact is the command-name tuple; `Result` is type-only.
-The deployment TypeScript configuration and the 10 kB budget are unchanged.
+Generated types alone do not validate untrusted data, trim prefixes, preserve
+preview text, or authorize callers. Parameter and policy checks remain handwritten;
+standalone runtime validators enforce output shapes, required/extra fields, literal
+booleans, nullability and Unicode length limits without coercion or field removal.
+`createExecutor(handlers)` applies the same validation boundary to injected handler
+fixtures; `execute` binds it to the four app-owned handlers. No generated handler
+bodies or stubs exist. Neither generator nor schema compiler is imported by runtime
+source. TypeScript includes the generated JavaScript and omits emitted comments;
+ESNext/Node resolution and the 10 kB budget remain unchanged.
 See [development guidance](../../DEVELOPMENT.md#regenerate-command-contracts)
 for regeneration and read-only drift checks.
 

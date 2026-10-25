@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import OpenRPCTypings from "@open-rpc/typings";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { generate } from "../scripts/command-contracts";
+import { generate, generateValidators } from "../scripts/command-contracts";
 
 const document = () =>
   JSON.parse(readFileSync("docs/reference/openrpc.json", "utf8"));
@@ -123,6 +123,40 @@ describe("OpenRPC contract generation", () => {
     `),
     ).toEqual([]);
   });
+  it("preserves local references, nullable outputs and Unicode lengths in standalone validators", async () => {
+    const contract = document();
+    contract.components.schemas = {
+      Preview: {
+        type: "object",
+        required: ["output"],
+        additionalProperties: false,
+        properties: { output: { type: ["string", "null"], maxLength: 2 } },
+      },
+    };
+    contract.methods[2].result.schema = {
+      $ref: "#/components/schemas/Preview",
+    };
+    const source = generateValidators(contract);
+    expect(generateValidators(contract)).toBe(source);
+    const { validOutput } = await import(
+      `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
+    );
+    for (const output of [null, "", "😀😀", "e\u0301"]) {
+      expect(validOutput("integration.preview", { output })).toBe(true);
+    }
+    for (const value of [
+      undefined,
+      {},
+      { output: 7 },
+      { output: "😀😀😀" },
+      { output: null, extra: true },
+    ]) {
+      expect(validOutput("integration.preview", value)).toBe(false);
+    }
+    // Importing the standalone data URL above also proves it runs without
+    // resolving any external modules, including Ajv's Unicode helper.
+  });
+
   it("detects catalog drift without writing and regeneration repairs the artifact", () => {
     const directory = mkdtempSync(resolve("tmp_rovo_contracts_"));
     try {
@@ -133,6 +167,16 @@ describe("OpenRPC contract generation", () => {
       const args = ["run", "scripts/generate-commands.ts", input, output];
       execFileSync("bun", args);
       const original = readFileSync(output, "utf8");
+      const validators = output.replace(/\.ts$/, ".validators.js");
+      const originalValidators = readFileSync(validators, "utf8");
+      writeFileSync(validators, "// stale validator");
+      const staleValidators = spawnSync("bun", [...args, "--check"], {
+        encoding: "utf8",
+      });
+      expect(staleValidators.status).toBe(1);
+      expect(readFileSync(validators, "utf8")).toBe("// stale validator");
+      execFileSync("bun", args);
+      expect(readFileSync(validators, "utf8")).toBe(originalValidators);
       expect(original).toContain("export interface Commands");
       execFileSync("bun", [...args, "--check"]);
       contract.methods.push({ ...contract.methods[0], name: "config.inspect" });

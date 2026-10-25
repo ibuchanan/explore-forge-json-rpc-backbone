@@ -268,10 +268,12 @@ bun run typecheck
 bun run test -- test/generation.test.ts test/contract.test.ts
 ```
 
-Do not edit `src/generated/commands.ts` manually. Implement new commands in the
-handwritten handler map in `src/executor.ts`; regeneration does not create handler
-bodies or grant permissions. A missing handler fails typecheck after generation.
-Keep runtime normalization and validation tests when changing schemas.
+Do not edit `src/generated/commands.ts` or `src/generated/commands.validators.js`
+manually. The latter is standalone Ajv output with bundled Unicode support;
+Ajv remains build-time only. Implement new commands in the handwritten handler
+map in `src/executor.ts`; regeneration does not create handler bodies or grant
+permissions. A missing handler fails typecheck after generation. Keep runtime
+normalization and validation tests when changing schemas.
 
 Use `bun run generate:commands:check` for read-only drift detection. It exits
 nonzero for missing or stale output without rewriting files. `bun run check`

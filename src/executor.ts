@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "@forge-ahead/errors";
 import type { CommandName, Commands, HandlerMap } from "./generated/commands";
+import { validOutput } from "./generated/commands.validators.js";
 
 export type { Commands } from "./generated/commands";
 
@@ -64,18 +65,33 @@ const handlers = {
   },
 } satisfies HandlerMap<Context, CommandFailure>;
 
-export async function execute(
-  method: Command,
-  params: unknown,
-  caller: Caller,
-  store: PrefixStore,
-): Promise<Result<Commands[Command]["result"], CommandFailure>> {
-  if (!caller.authorized || !["api", "ui"].includes(caller.source))
-    return err("forbidden");
-  if (!Object.hasOwn(handlers, method)) return err("method-not-found");
-  try {
-    return await handlers[method](params, { caller, store });
-  } catch {
-    return err("internal");
-  }
+type Handlers = {
+  [M in Command]: (
+    params: unknown,
+    context: Context,
+  ) => ReturnType<HandlerMap<Context, CommandFailure>[M]>;
+};
+
+export function createExecutor(handlers: Handlers) {
+  return async (
+    method: Command,
+    params: unknown,
+    caller: Caller,
+    store: PrefixStore,
+  ): Promise<Result<Commands[Command]["result"], CommandFailure>> => {
+    if (!caller.authorized || !["api", "ui"].includes(caller.source))
+      return err("forbidden");
+    if (!Object.hasOwn(handlers, method)) return err("method-not-found");
+    try {
+      const result = await handlers[method](params, { caller, store });
+      return result.match(
+        (value) => (validOutput(method, value) ? result : err("internal")),
+        () => result,
+      );
+    } catch {
+      return err("internal");
+    }
+  };
 }
+
+export const execute = createExecutor(handlers);
