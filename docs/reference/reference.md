@@ -135,6 +135,22 @@ ESNext/Node resolution and the 10 kB budget remain unchanged.
 See [development guidance](../../DEVELOPMENT.md#regenerate-command-contracts)
 for regeneration and read-only drift checks.
 
+## Local product-event contract proof
+
+`test/native/product-event.ts` binds Jira issue-created events only to
+`integration.preview`. It accepts an injected executor and caller-owned policy,
+constructs non-UI caller context separately, and maps only the issue summary to
+preview text. It is not exported by the app or wired into the manifest.
+
+Success returns `undefined`; terminal failures are recorded and acknowledged.
+An explicitly transient read can return the SDK's `InvocationError`, subject to
+app retry permission and the four-retry limit. Uncertain effects require
+reconciliation, never an automatic retry. Production `internal` remains terminal
+in this fixture; it does not imply transience. The
+[contract evidence](../../specs/native-outcome-translation.md) records sources,
+local-only failure classifications, and limits. This is not delivery or scheduling
+verification and does not establish actual trigger-package runtime integration.
+
 ## Identity and authorization
 
 The trusted caller has source `api` or `ui` and an `authorized` boolean.

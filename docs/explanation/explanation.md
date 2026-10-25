@@ -70,12 +70,14 @@ executor, not in the transport or schema: valid confirmation and UI authorizatio
 are both required. A storage exception cannot impersonate a trusted command error,
 and a failed write is not automatically retried or rolled back.
 
-This is not yet a complete reusable command library or proof of native completion.
-Actual trigger-library reuse also remains unproven: `@forge-ahead/triggers` is
-declared but not imported by runtime source. Runtime output validation is still
-future work. JSON-RPC remains a first-class supported
-adapter rather than becoming an incidental example. The
-[main spec](../../specs/spec.md) owns that remaining work; the
+This is not yet a complete reusable command library or deployed native consumer.
+A [local product-event proof](../../specs/native-outcome-translation.md) now separates
+command outcomes from acknowledgment and explicit retry requests. Actual
+trigger-library reuse by an installed entry point remains unproven: the local
+fixture uses only its invocation-context type. Standalone generated validators
+check successful command output before adapter success. JSON-RPC remains a
+first-class supported adapter rather than becoming an incidental example. The
+[main spec](../../specs/spec.md) owns the remaining work; the
 [runtime reference](../reference/reference.md) records the implemented boundary.
 
 Native completion is the important variation. An HTTP caller needs a response;

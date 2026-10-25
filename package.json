@@ -56,6 +56,7 @@
     "@ast-grep/cli": "^0.51",
     "@biomejs/biome": "2.6.2",
     "@forge-ahead/prelint": "github:ibuchanan/tool-forge-prelint-ast-grep",
+    "@forge/events": "3.0.8",
     "@open-rpc/meta-schema": "^1.14",
     "@open-rpc/typings": "1.13.1",
     "@size-limit/file": "^14.3",
