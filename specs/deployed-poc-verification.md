@@ -182,6 +182,42 @@ real installation isolation, backend-log inspection, native delivery, and all
 changed-revision deployed behavior remain unverified. No live request, deployment,
 provisioning, reset, dependency change, or peer-repository edit was performed.
 
+## Ticket 11 deployed attempt, 2026-10-25
+
+The operator reported running `npm run forge:deploy`, then explicitly requested
+`npm run test:deployed`. The assistant invoked the existing package script as
+`bun run test:deployed`, through SecretSpec and `scripts/test-deployed.sh`.
+This was one attempt, not an automatic repeat of the historical passing run.
+
+| Field | Observed evidence |
+| --- | --- |
+| Local source revision | `c9896641581a8f3b60d2e78a719df2baee060481`; no runtime changes in this session |
+| Deployment | Operator-reported invocation only; successful deployment, deployed revision, upgrade and Forge version not independently established |
+| Target | Runner accepted development Jira controls; exact site/installation and cached endpoint ownership not independently established |
+| URL policy | Stored URL reused; no Forge lookup or URL creation reported |
+| Run ID | `28481051-0855-4150-91a4-7ccaea7920f3` |
+| First captured narrative time | `2026-10-25T22:44:12.237Z`, from the logger's epoch timestamp |
+| Result | Interrupted during deployed readiness; package runner reported exit code `143` |
+| Local preflight | Passed |
+| Deployed readiness | Started; no completion or valid response captured |
+| JSON report / durations | Standard output empty; no final report or completed-check timing report produced |
+| Write boundary | No configuration-write check reached in the captured sequence; current saved state not established |
+| Recovery actions | No retry, reset, restoration, deployment, upgrade or credential change by the assistant |
+
+The captured local narrative contains four steps: run start, preflight start,
+preflight pass, and deployed readiness start. It does not explain the interruption
+or establish a network/backend failure. The operator's subsequent “Looks good”
+message contains no separate report or command output and is not treated as a
+completed suite. Only the local preflight is verified by this attempt.
+
+No command/principal success or denial is established by an unfinished readiness
+request. In particular, `config.get`, `config.set`, `config.reset` denial, and
+`integration.preview` remain unverified for this changed-revision attempt.
+Installed UI, backend-log inspection, second-installation isolation, native
+delivery/retry scheduling, deployed revision and tunnel state also remain
+unverified. Ticket 11 stays open; the historical 30-check pass above is unchanged.
+This is an evidence-only update, not a runtime change or a new TDD cycle.
+
 ## Live acceptance evidence
 
 Statuses below reflect the dated operator-supplied report, not an independent
