@@ -4,8 +4,9 @@
 
 Originally recorded: 2026-10-24. Implementation baseline: `37bfac0` (Ticket 03).
 Ticket 04 added verification tooling without a live acceptance claim.
-The dated 2026-10-25 operator evidence below records a successful deployed HTTP
-run; installed UI, isolation, and production acceptance remain unverified.
+The dated 2026-10-25 evidence records a passing deployed HTTP suite, an installed
+UI walkthrough transcript and deployed backend logs. Detailed visual acceptance,
+isolation, deployment revision and production acceptance remain unverified.
 
 ## Original target and approval record, 2026-10-24
 
@@ -284,10 +285,59 @@ The assistant made no runtime changes, new tests, automatic retry, reset or live
 request while recording this report. No further HTTP rerun is needed for this
 evidence; another full run requires unset configuration.
 
+## Ticket 11 installed UI and backend logs, 2026-10-25
+
+The operator confirmed the same development Jira installation as the passing
+HTTP run, with no active Forge tunnel, and supplied a
+[Loom walkthrough](https://www.loom.com/share/92b02d8363124e14801aea721db91237)
+and grouped development backend logs. Exact site/installation identifiers,
+browser, deployed source revision and Forge deployment version were not supplied.
+Local HEAD at receipt was `c089425da414be3e95e722c735fcacbfca280c6f`;
+only evidence documentation changed since `c989664`.
+
+The recording is titled **Configured and Verified POC SmileyFace**, created
+`2026-10-25T23:12:48.669Z`, duration 61.89 seconds. The assistant retrieved its
+metadata and full transcript through TWG, not video frames. At 0 seconds the
+operator narrates refreshes and navigation to Configure and Get started; at
+30.818 seconds, configured/verified feedback and running preview. This supports
+an operator-reported three-screen walkthrough, not independent visual inspection.
+The transcript does not establish exact preview output, markup rendering,
+page-reload persistence, both Manage apps entry points, or all loading/error states.
+
+The supplied `forge logs` excerpt covers `2026-10-25T22:58:29Z` through
+`23:13:52Z`. Unlike the HTTP runner narrative, it contains deployed `config-rpc`
+records with `rpc.invoke`, two lifecycle steps, and `rpc.complete`. Each pair
+shares an app-generated `invocationId`; Forge's outer invocation ID is distinct.
+
+| Deployed observation | Evidence |
+| --- | --- |
+| UI `config.get` | Successful saved-state reads, including app invocation `2106820c-b248-4b82-ad2e-f0e218c5bd7e` at `23:13:39Z` |
+| UI `integration.preview` | Success at `23:13:41Z` and `23:13:52Z`, 27.542097 ms and 26.309189 ms |
+| UI `config.reset` | Success at `23:02:45Z`, app invocation `1abf4cb0-fabe-459c-967d-9865432a62bf`, 52.825730 ms |
+| Reset read-back | Subsequent UI `config.get` reports no saved prefix at `23:02:45.710Z`; HTTP initial-unset check then passed |
+| HTTP commands | API save, persisted reads, reset denial (`-32001`) and previews corroborate the passing suite |
+| Completion semantics | Successful calls have `outcome: succeeded`; expected denials have `outcome: rejected`; both use `disposition: response-ready` |
+
+The excerpt's warnings match intentional verifier rejections: HTTP 401/405/415/
+413 and RPC `-32700`, `-32600`, `-32601`, `-32602`, `-32001`, `-32002`.
+No internal-error completion or exposed prefix, preview input/output, bearer
+credential or endpoint appears in this excerpt. This is a bounded inspection,
+not a whole-environment security review; browser console exposure is unverified.
+UI `config.set` execution remains unverified because it is not shown here.
+
+The earlier reset is now corroborated, without another destructive action. The
+last established configuration remains `poc-😀`, saved by the HTTP suite; the
+walkthrough uses read/preview operations. Isolation, native delivery and retry
+scheduling remain unverified. Ticket 11 remains partially verified for missing
+exact deployment metadata and detailed UI observations. No new live app request,
+reset, retry, deployment, credential change or runtime change was performed by
+the assistant while recording this evidence.
+
 ## Live acceptance evidence
 
-Statuses below reflect the dated operator-supplied report, not an independent
-assistant execution. Missing evidence remains unverified.
+Statuses below summarize dated operator reports, the retrieved Loom transcript,
+and supplied deployed logs, not an independent assistant live run. Historical
+attempts above retain their original scope; missing evidence remains unverified.
 
 | Check | Status | Evidence / discrepancy |
 | --- | --- | --- |
@@ -296,13 +346,17 @@ assistant execution. Missing evidence remains unverified.
 | HTTP malformed/unsupported requests | Passed, operator-reported | HTTP guards and JSON-RPC validation checks passed |
 | HTTP unset configuration and not-configured preview | Passed, operator-reported | Initial/still-unset reads and preview-before-setup passed |
 | HTTP save, separate read-back and preview | Passed, operator-reported | Save, persistence, reset denial/preservation, and preview checks passed |
-| HTTP total and per-call runtimes | Recorded, operator-reported | Suite 10.48 seconds; per-check durations supplied, not isolated server timings |
+| HTTP total and per-call runtimes | Recorded, operator-reported | Historical suite 10.48 seconds; ticket 11 suite 12.393711 seconds, plus selected backend timings |
 | Second installation isolation | Unverified | Report explicitly says `unverified` |
-| UI empty and loading | Unverified | Not established by the HTTP report |
-| UI save and read-back after reload | Unverified | No manual journey evidence attached here |
-| UI exact preview parity with HTTP/OpenRPC | Unverified | Not established by the HTTP report |
+| Same installation / no tunnel | Confirmed, operator-reported | Operator affirmed development target matches the passing HTTP run; exact identifiers/revision not supplied |
+| Installed three-screen walkthrough | Supported, operator-reported | Linked Loom transcript narrates refresh, Configure, Get started, configured feedback and preview; frames not inspected |
+| UI read, reset and preview execution | Verified in supplied backend excerpt | Successful UI calls; reset followed by an unset-state read |
+| UI empty and loading | Partially evidenced | Empty backend state after reset verified; loading/empty visual states unverified |
+| UI save and read-back after reload | Unverified | No UI save or explicit reload evidence supplied |
+| UI exact preview parity with HTTP/OpenRPC | Unverified | Transcript/logs omit exact UI output text |
 | UI validation and resolver failure | Unverified | No safe failure-injection evidence attached here |
-| Backend logs and browser console free of exposure | Unverified | Neither supplied nor inspected for this run |
+| Deployed backend log exposure | No exposure observed in excerpt | Safe narratives, correlated completions and expected verifier warnings; not a complete-environment claim |
+| Browser console exposure | Unverified | Console evidence not supplied |
 | Authorization model for real API operations | Unverified | POC has no real integration |
 
 Replace unverified entries only with dated observations from the approved target.
@@ -336,11 +390,12 @@ and package license metadata are not security or legal approval.
 
 **Defer real integration. Retain the HTTP adapter provisionally for evaluation,
 not as an accepted production surface.** The 2026-10-25 operator report provides
-deployed HTTP verification evidence for this POC. Installed UI, second-installation
-isolation, and deployed backend-log inspection remain unverified in this record;
-authorization for real operations has not been designed. The passing HTTP run
-does not by itself establish that its testing value justifies the public endpoint,
-credential provisioning, and maintenance cost.
+deployed HTTP verification evidence for this POC. Ticket 11 additionally records
+an installed-UI walkthrough transcript and corroborating deployed backend logs.
+Detailed visual UI acceptance, exact deployment identity and second-installation
+isolation remain unverified; authorization for real operations is not designed.
+The passing HTTP run does not by itself establish that its testing value
+justifies the public endpoint, credential provisioning, and maintenance cost.
 
 Recommend a real integration only after both deployed seams pass, authorization
 is justified separately for each caller and real operation, the dependency
