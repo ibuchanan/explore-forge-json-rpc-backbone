@@ -181,6 +181,13 @@ future operations have not been designed by this POC.
 
 ## HTTP adapter
 
+The installed `@forge-ahead/triggers` 0.2.1 package is not consumed by this
+runtime adapter. Direct helper substitution changes the required exact response
+objects or JSON-RPC rejection envelope; the
+[compatibility experiment](../../specs/trigger-plumbing-compatibility.md) records
+the expected-failure fixtures and deferred adoption. A declared dependency and
+the local native fixture's type-only reuse do not establish runtime integration.
+
 The `config-rpc` v2 dynamic web-trigger module maps to function `rpc`, handler
 `index.run`. Its response uses Forge's array-valued headers and string body.
 
