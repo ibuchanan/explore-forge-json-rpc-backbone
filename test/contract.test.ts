@@ -39,6 +39,9 @@ const store = () => {
     set: async (value: string) => {
       prefix = value;
     },
+    reset: async () => {
+      prefix = undefined;
+    },
   };
 };
 
@@ -56,6 +59,7 @@ describe("OpenRPC contract", () => {
       "config.get",
       "config.set",
       "integration.preview",
+      "config.reset",
     ]);
     expect(
       contract.methods.every(
@@ -85,6 +89,110 @@ describe("OpenRPC contract", () => {
         );
       }
     }
+  });
+
+  it("reset schemas and documented errors match runtime behavior", async () => {
+    const reset = contract.methods.find(
+      ({ name }: { name: string }) => name === "config.reset",
+    );
+    expect(reset.params).toHaveLength(1);
+    expect(reset.params[0]).toMatchObject({
+      name: "confirm",
+      required: true,
+      schema: { type: "boolean", enum: [true] },
+    });
+    const validResult = ajv.compile(reset.result.schema);
+    expect(validResult({ configured: false })).toBe(true);
+    expect(validResult({ configured: true })).toBe(false);
+    expect(validResult({})).toBe(false);
+    expect(validResult({ configured: false, extra: true })).toBe(false);
+
+    const storage = store();
+    await dispatch(
+      { jsonrpc: "2.0", method: "config.set", params: { prefix: "hi" }, id: 1 },
+      caller,
+      storage,
+    );
+    // UI caller with authorization can reset
+    expect(
+      await dispatch(
+        {
+          jsonrpc: "2.0",
+          method: "config.reset",
+          params: { confirm: true },
+          id: "reset",
+        },
+        { source: "ui", authorized: true },
+        storage,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "reset",
+      result: { configured: false },
+    });
+    // Idempotent: already unconfigured
+    expect(
+      await dispatch(
+        {
+          jsonrpc: "2.0",
+          method: "config.reset",
+          params: { confirm: true },
+          id: "again",
+        },
+        { source: "ui", authorized: true },
+        storage,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "again",
+      result: { configured: false },
+    });
+    // API caller gets forbidden even if authorized
+    expect(
+      await dispatch(
+        {
+          jsonrpc: "2.0",
+          method: "config.reset",
+          params: { confirm: true },
+          id: "api",
+        },
+        { source: "api", authorized: true },
+        storage,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "api",
+      error: contract.components.errors.Forbidden,
+    });
+    // Invalid params: missing confirm
+    expect(
+      await dispatch(
+        { jsonrpc: "2.0", method: "config.reset", params: {}, id: "missing" },
+        { source: "ui", authorized: true },
+        storage,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "missing",
+      error: contract.components.errors.InvalidParams,
+    });
+    // Invalid params: confirm not exactly true
+    expect(
+      await dispatch(
+        {
+          jsonrpc: "2.0",
+          method: "config.reset",
+          params: { confirm: false },
+          id: "false",
+        },
+        { source: "ui", authorized: true },
+        storage,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "false",
+      error: contract.components.errors.InvalidParams,
+    });
   });
 
   it("preview schemas and documented errors match runtime behavior", async () => {
@@ -136,17 +244,38 @@ describe("OpenRPC contract", () => {
   });
 
   it("method parameter and result shapes agree with actual examples", async () => {
-    const storage = store();
     for (const method of contract.methods) {
+      const storage = store();
       const example = method.examples[0];
       const params = Object.fromEntries(
         example.params.map(
           ({ name, value }: { name: string; value: unknown }) => [name, value],
         ),
       );
+      // Use UI caller for config.reset since it requires source === "ui"
+      const methodCaller =
+        method.name === "config.reset"
+          ? { source: "ui" as const, authorized: true }
+          : caller;
+      // Prepare the saved value used by preview/reset examples.
+      if (
+        method.name === "integration.preview" ||
+        method.name === "config.reset"
+      ) {
+        await dispatch(
+          {
+            jsonrpc: "2.0",
+            method: "config.set",
+            params: { prefix: "hi" },
+            id: 0,
+          },
+          caller,
+          storage,
+        );
+      }
       const result = await dispatch(
         { jsonrpc: "2.0", method: method.name, params, id: 1 },
-        caller,
+        methodCaller,
         storage,
       );
       expect(result).toEqual({

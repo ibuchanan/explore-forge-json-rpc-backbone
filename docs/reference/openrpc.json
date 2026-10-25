@@ -23,12 +23,30 @@
     }
   },
   "x-protocolErrors": [
-    { "code": -32700, "message": "Parse error" },
-    { "code": -32600, "message": "Invalid Request" },
-    { "code": -32601, "message": "Method not found" },
-    { "code": -32602, "message": "Invalid params" },
-    { "code": -32603, "message": "Internal error" },
-    { "code": -32001, "message": "Forbidden" }
+    {
+      "code": -32700,
+      "message": "Parse error"
+    },
+    {
+      "code": -32600,
+      "message": "Invalid Request"
+    },
+    {
+      "code": -32601,
+      "message": "Method not found"
+    },
+    {
+      "code": -32602,
+      "message": "Invalid params"
+    },
+    {
+      "code": -32603,
+      "message": "Internal error"
+    },
+    {
+      "code": -32001,
+      "message": "Forbidden"
+    }
   ],
   "methods": [
     {
@@ -44,8 +62,12 @@
           "required": ["configured", "prefix"],
           "additionalProperties": false,
           "properties": {
-            "configured": { "type": "boolean" },
-            "prefix": { "type": ["string", "null"] }
+            "configured": {
+              "type": "boolean"
+            },
+            "prefix": {
+              "type": ["string", "null"]
+            }
           }
         }
       },
@@ -55,11 +77,18 @@
           "params": [],
           "result": {
             "name": "configuration",
-            "value": { "configured": false, "prefix": null }
+            "value": {
+              "configured": false,
+              "prefix": null
+            }
           }
         }
       ],
-      "errors": [{ "$ref": "#/components/errors/Forbidden" }]
+      "errors": [
+        {
+          "$ref": "#/components/errors/Forbidden"
+        }
+      ]
     },
     {
       "name": "config.set",
@@ -70,7 +99,11 @@
         {
           "name": "prefix",
           "required": true,
-          "schema": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
           "description": "Validated after trimming; length counts Unicode code points."
         }
       ],
@@ -81,19 +114,38 @@
           "type": "object",
           "required": ["configured"],
           "additionalProperties": false,
-          "properties": { "configured": { "type": "boolean", "enum": [true] } }
+          "properties": {
+            "configured": {
+              "type": "boolean",
+              "enum": [true]
+            }
+          }
         }
       },
       "examples": [
         {
           "name": "save prefix",
-          "params": [{ "name": "prefix", "value": "  hi  " }],
-          "result": { "name": "configuration", "value": { "configured": true } }
+          "params": [
+            {
+              "name": "prefix",
+              "value": "  hi  "
+            }
+          ],
+          "result": {
+            "name": "configuration",
+            "value": {
+              "configured": true
+            }
+          }
         }
       ],
       "errors": [
-        { "$ref": "#/components/errors/InvalidParams" },
-        { "$ref": "#/components/errors/Forbidden" }
+        {
+          "$ref": "#/components/errors/InvalidParams"
+        },
+        {
+          "$ref": "#/components/errors/Forbidden"
+        }
       ]
     },
     {
@@ -105,7 +157,10 @@
         {
           "name": "text",
           "required": true,
-          "schema": { "type": "string", "maxLength": 2000 },
+          "schema": {
+            "type": "string",
+            "maxLength": 2000
+          },
           "description": "Preserved exactly; length counts Unicode code points. Extra parameters are rejected."
         }
       ],
@@ -116,28 +171,115 @@
           "type": "object",
           "required": ["output"],
           "additionalProperties": false,
-          "properties": { "output": { "type": "string", "maxLength": 2064 } }
+          "properties": {
+            "output": {
+              "type": "string",
+              "maxLength": 2064
+            }
+          }
         }
       },
       "examples": [
         {
           "name": "preview after saving hi",
-          "params": [{ "name": "text", "value": " there 😀" }],
-          "result": { "name": "preview", "value": { "output": "hi there 😀" } }
+          "params": [
+            {
+              "name": "text",
+              "value": " there \ud83d\ude00"
+            }
+          ],
+          "result": {
+            "name": "preview",
+            "value": {
+              "output": "hi there \ud83d\ude00"
+            }
+          }
         }
       ],
       "errors": [
-        { "$ref": "#/components/errors/InvalidParams" },
-        { "$ref": "#/components/errors/Forbidden" },
-        { "$ref": "#/components/errors/NotConfigured" }
+        {
+          "$ref": "#/components/errors/InvalidParams"
+        },
+        {
+          "$ref": "#/components/errors/Forbidden"
+        },
+        {
+          "$ref": "#/components/errors/NotConfigured"
+        }
+      ]
+    },
+    {
+      "name": "config.reset",
+      "summary": "Clear the saved prefix in installation-scoped Forge KVS (admin only).",
+      "description": "Requires a trusted UI caller with Jira ADMINISTER permission and exactly confirm: true. Authenticated HTTP callers are forbidden (-32001). Deletes only config.prefix; does not alter app identity, bearer credentials or unrelated storage. Idempotent if already unset. The UI performs a separate config.get read-back before showing success.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "confirm",
+          "required": true,
+          "schema": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "description": "Must be exactly true to prevent accidental resets."
+        }
+      ],
+      "result": {
+        "name": "configuration",
+        "required": true,
+        "schema": {
+          "type": "object",
+          "required": ["configured"],
+          "additionalProperties": false,
+          "properties": {
+            "configured": {
+              "type": "boolean",
+              "enum": [false]
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "name": "reset after configuration",
+          "params": [
+            {
+              "name": "confirm",
+              "value": true
+            }
+          ],
+          "result": {
+            "name": "configuration",
+            "value": {
+              "configured": false
+            }
+          }
+        }
+      ],
+      "errors": [
+        {
+          "$ref": "#/components/errors/InvalidParams"
+        },
+        {
+          "$ref": "#/components/errors/Forbidden"
+        }
       ]
     }
   ],
   "components": {
     "errors": {
-      "Forbidden": { "code": -32001, "message": "Forbidden" },
-      "InvalidParams": { "code": -32602, "message": "Invalid params" },
-      "NotConfigured": { "code": -32002, "message": "Not configured" }
+      "Forbidden": {
+        "code": -32001,
+        "message": "Forbidden"
+      },
+      "InvalidParams": {
+        "code": -32602,
+        "message": "Invalid params"
+      },
+      "NotConfigured": {
+        "code": -32002,
+        "message": "Not configured"
+      }
     }
   }
 }

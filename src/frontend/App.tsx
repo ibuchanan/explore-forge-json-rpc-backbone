@@ -28,7 +28,7 @@ const textHelp =
   "Empty text is allowed; maximum 2,000 Unicode code points. Uses the saved prefix, not unsaved edits.";
 
 type Config = Commands["config.get"]["result"];
-type Operation = "load" | "save" | "preview" | "navigate";
+type Operation = "load" | "save" | "reset" | "preview" | "navigate";
 
 function PrefixForm({
   prefix,
@@ -145,6 +145,9 @@ export function App({ page = "configure" }: { page?: Page }) {
   const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState(0);
   const busy = useRef(false);
 
   const perform = useCallback(
@@ -154,6 +157,8 @@ export function App({ page = "configure" }: { page?: Page }) {
       setPending(operation);
       setError("");
       setSaved(false);
+      setResetComplete(false);
+      setConfirmReset(false);
       try {
         await action();
       } catch (error) {
@@ -207,6 +212,30 @@ export function App({ page = "configure" }: { page?: Page }) {
       }
     });
 
+  const reset = () => {
+    if (!confirmReset) return;
+    return perform("reset", async () => {
+      setConfig(null);
+      setOutput(null);
+      let accepted = false;
+      try {
+        await rpc("config.reset", { confirm: true });
+        accepted = true;
+        const result = await rpc("config.get", {});
+        if (result.configured || result.prefix !== null)
+          throw new Error("Reset read-back did not match");
+        setConfig(result);
+        setFormVersion((version) => version + 1);
+        setResetComplete(true);
+        setPreviewVersion((version) => version + 1);
+      } catch (error) {
+        setError(
+          `${accepted ? "Configuration was reset, but read-back verification failed." : "Reset could not be confirmed; configuration may have changed."} Retry the read before attempting another reset. ${failureMessage(error)}`,
+        );
+      }
+    });
+  };
+
   const preview = (text: string) =>
     perform("preview", async () => {
       setOutput(null);
@@ -228,7 +257,7 @@ export function App({ page = "configure" }: { page?: Page }) {
       }
     });
 
-  const disabled = pending !== null || config === null;
+  const disabled = pending !== null || config === null || confirmReset;
   return (
     <Stack space="space.200">
       {page === "status" && (
@@ -272,9 +301,11 @@ export function App({ page = "configure" }: { page?: Page }) {
               ? "Loading configuration"
               : pending === "save"
                 ? "Saving prefix and verifying"
-                : pending === "preview"
-                  ? "Running preview"
-                  : "Opening page"
+                : pending === "reset"
+                  ? "Resetting configuration and verifying"
+                  : pending === "preview"
+                    ? "Running preview"
+                    : "Opening page"
           }
         />
       )}
@@ -301,7 +332,16 @@ export function App({ page = "configure" }: { page?: Page }) {
           </Text>
         </SectionMessage>
       )}
-      {config && pending !== "save" && !error && (
+      {resetComplete && (
+        <SectionMessage appearance="success" title="Configuration reset">
+          <Text>
+            The saved demo prefix was removed and the unconfigured state was
+            verified. Preview is disabled until you save a new prefix. The HTTP
+            bearer secret and app installation have not changed.
+          </Text>
+        </SectionMessage>
+      )}
+      {config && pending !== "save" && pending !== "reset" && !error && (
         <Stack space="space.100">
           <Inline space="space.150" alignBlock="center" shouldWrap>
             <Lozenge
@@ -386,13 +426,14 @@ export function App({ page = "configure" }: { page?: Page }) {
       {page === "configure" && (
         <>
           <PrefixForm
-            key={config ? formVersion : "unavailable"}
+            key={config ? `prefix-${formVersion}` : "unavailable"}
             prefix={config?.prefix ?? ""}
             disabled={disabled}
             saving={pending === "save"}
             onSave={save}
           />
           <PreviewForm
+            key={`preview-${previewVersion}`}
             disabled={disabled || !config?.configured}
             running={pending === "preview"}
             onRun={preview}
@@ -417,6 +458,60 @@ export function App({ page = "configure" }: { page?: Page }) {
               />
             </Stack>
           )}
+          <Stack space="space.100">
+            <Heading as="h2" size="small">
+              Reset demo configuration
+            </Heading>
+            <Text>
+              Remove this installation’s saved prefix to repeat the unconfigured
+              verification flow. This cannot be undone; only reset a test
+              setting you are authorized to discard. It does not delete the HTTP
+              bearer secret or uninstall the app.
+            </Text>
+            {confirmReset ? (
+              <>
+                <SectionMessage
+                  appearance="warning"
+                  title="Remove the saved prefix?"
+                >
+                  <Text>
+                    Confirm reset to delete the saved prefix for this
+                    installation. Preview will stop working until a new prefix
+                    is saved.
+                  </Text>
+                </SectionMessage>
+                <ButtonGroup label="Confirm configuration reset">
+                  <Button
+                    appearance="danger"
+                    isDisabled={pending !== null}
+                    onClick={() => {
+                      void reset();
+                    }}
+                  >
+                    Confirm reset
+                  </Button>
+                  <Button
+                    isDisabled={pending !== null}
+                    onClick={() => setConfirmReset(false)}
+                  >
+                    Cancel
+                  </Button>
+                </ButtonGroup>
+              </>
+            ) : (
+              <Button
+                appearance="danger"
+                isDisabled={disabled || !config?.configured}
+                onClick={() => {
+                  if (busy.current) return;
+                  setSaved(false);
+                  setConfirmReset(true);
+                }}
+              >
+                Reset configuration
+              </Button>
+            )}
+          </Stack>
         </>
       )}
       <ButtonGroup label="Admin pages">
@@ -426,7 +521,7 @@ export function App({ page = "configure" }: { page?: Page }) {
             <Button
               key={target}
               appearance={target === "configure" ? "primary" : "default"}
-              isDisabled={pending !== null}
+              isDisabled={pending !== null || confirmReset}
               onClick={() => {
                 void navigate(target);
               }}

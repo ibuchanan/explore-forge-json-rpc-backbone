@@ -49,6 +49,19 @@ site is not approval to use that site.
   and scope/StrictMode notes, and OpenRPC's ignored URI-format warnings. The
   initial new-document format/spelling failures were corrected before the pass.
 
+## Repeat-run support added 2026-10-25
+
+The local verifier now includes a static `message` on failed preflight checks,
+identifying the required setting without printing its value. Preflight performs
+no network requests; a saved UI prefix instead affects the later `config.get unset`
+check. Configure now offers an admin-authorized, confirmed reset of `config.prefix`
+with read-back verification. It does not reset the bearer credential or install.
+The verifier still never resets/restores data itself: operators must deliberately
+reset approved test configuration through the UI before repeating the full suite.
+These are implementation changes, not a new live acceptance claim. Follow the
+[Admin UI reset guide](../docs/how-to/prove-admin-ui.md#reset-demo-configuration-for-another-verification-run)
+for the current repeat-run procedure; the earlier evidence above remains historical.
+
 ## Live acceptance evidence
 
 | Check | Status | Evidence / discrepancy |

@@ -16,6 +16,9 @@ const memory = (): PrefixStore => {
     set: async (value) => {
       prefix = value;
     },
+    reset: async () => {
+      prefix = undefined;
+    },
   };
 };
 const secret = "a-private-test-token-long-enough";
@@ -183,6 +186,7 @@ describe("public web trigger boundary", () => {
         const store = {
           get: vi.fn(async () => undefined),
           set: vi.fn(async () => {}),
+          reset: vi.fn(async () => {}),
         };
         for (const payload of [
           request("config.get"),
@@ -223,6 +227,7 @@ describe("public web trigger boundary", () => {
     const store = {
       get: vi.fn(async () => undefined),
       set: vi.fn(async () => {}),
+      reset: vi.fn(async () => {}),
     };
     expect((await handleHttp(makeEvent(), undefined, store)).statusCode).toBe(
       503,
@@ -243,6 +248,7 @@ describe("public web trigger boundary", () => {
           const store = {
             get: vi.fn(async () => undefined),
             set: vi.fn(async () => {}),
+            reset: vi.fn(async () => {}),
           };
           const response = await handleHttp(
             makeEvent(undefined, payload),
@@ -277,6 +283,7 @@ describe("public web trigger boundary", () => {
     const store = {
       get: vi.fn(async () => undefined),
       set: vi.fn(async () => {}),
+      reset: vi.fn(async () => {}),
     };
     expect(
       (await handleHttp({ ...makeEvent(), method: "GET" }, secret, store))
@@ -306,5 +313,65 @@ describe("public web trigger boundary", () => {
       error: { code: -32700, message: "Parse error" },
     });
     expect(store.get).not.toHaveBeenCalled();
+  });
+
+  it("forbids reset via authenticated HTTP and preserves saved configuration", async () => {
+    const store = memory();
+    const execute = async (method: string, params: object) => {
+      const response = await handleHttp(
+        makeEvent(undefined, JSON.stringify(request(method, params))),
+        secret,
+        store,
+      );
+      expect(response.statusCode).toBe(200);
+      return body(response);
+    };
+    // Set initial configuration
+    expect(await execute("config.set", { prefix: "to-reset" })).toHaveProperty(
+      "result.configured",
+      true,
+    );
+    // Verify it's set
+    expect(await execute("config.get", {})).toHaveProperty(
+      "result.prefix",
+      "to-reset",
+    );
+    // Reset (API caller should get Forbidden)
+    expect(await execute("config.reset", { confirm: true })).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      error: { code: -32001, message: "Forbidden" },
+    });
+    // Verify still configured (API caller couldn't reset)
+    expect(await execute("config.get", {})).toHaveProperty(
+      "result.prefix",
+      "to-reset",
+    );
+  });
+
+  it("rejects reset with missing or invalid confirm parameters", async () => {
+    const store = memory();
+    const execute = async (params: object) => {
+      const response = await handleHttp(
+        makeEvent(undefined, JSON.stringify(request("config.reset", params))),
+        secret,
+        store,
+      );
+      expect(response.statusCode).toBe(200);
+      return body(response);
+    };
+    for (const params of [
+      {},
+      { confirm: false },
+      { confirm: "true" },
+      { confirm: 1 },
+      { confirm: true, extra: "field" },
+    ]) {
+      expect(await execute(params)).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32602, message: "Invalid params" },
+      });
+    }
   });
 });

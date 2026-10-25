@@ -15,7 +15,9 @@
     the app's **Get started** button in Manage Apps and from Status.
 - Preserve the existing JSON-RPC commands, administrator authorization, KVS data,
   prefix validation, and preview behavior. No new dependencies, scopes, egress,
-  reset command, lifecycle handlers, or remote operations are required.
+  lifecycle handlers, or remote operations are required.
+- Approved follow-up: add an admin-only confirmed reset on Configure to remove
+  the saved demo prefix. Reset does not change credentials or app identity.
 - Reuse the peer's separation of responsibilities, not its external-service
   signup, URL/token configuration, illustrations, or connectivity checks.
 
@@ -31,7 +33,13 @@
   - **Configure:** Existing prefix form, Save with read-back verification, preview
     form and literal output, and a route back to Status. Keep the current field
     help, Unicode limits, loading feedback, sanitized errors, and duplicate-action
-    protection.
+    protection. Add **Reset configuration** with a warning, **Confirm reset**,
+    and **Cancel**. Opening confirmation and canceling make no backend call;
+    block edits/navigation until resolved. Reset uses the authorized UI command,
+    then read-back; clear stale output immediately and show success only on a
+    verified **Not configured** result. Clear sample input after verified reset.
+    On uncertain deletion or failed read-back, hide stale
+    state and offer a read-only Retry, not an automatic repeated delete.
   - **Get started:** Brief explanation and an onboarding checklist: save a prefix
     (completion derived from `config.get`), then run the preview on Configure.
     Explain that preview only combines prefix and text and makes no Jira or

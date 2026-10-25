@@ -32,6 +32,9 @@ const memory = (): PrefixStore => {
     set: async (value) => {
       prefix = value;
     },
+    reset: async () => {
+      prefix = undefined;
+    },
   };
 };
 
@@ -79,6 +82,7 @@ describe("shared JSON-RPC commands", () => {
     const store = {
       get: vi.fn(async () => undefined),
       set: vi.fn(async () => {}),
+      reset: vi.fn(async () => {}),
     };
     for (const params of [
       {},
@@ -352,6 +356,7 @@ describe("shared JSON-RPC commands", () => {
         const storage = {
           get: vi.fn(async () => undefined),
           set: vi.fn(async () => {}),
+          reset: vi.fn(async () => {}),
         };
         expect(await dispatch(value, context, storage)).toHaveProperty(
           "error.code",
@@ -371,6 +376,7 @@ describe("shared JSON-RPC commands", () => {
     const store = {
       get: vi.fn(async () => undefined),
       set: vi.fn(async () => {}),
+      reset: vi.fn(async () => {}),
     };
     expect(
       await dispatch(
@@ -422,6 +428,7 @@ describe("shared JSON-RPC commands", () => {
         throw new Error("sensitive details");
       },
       set: vi.fn(),
+      reset: vi.fn(),
     };
     try {
       for (const payload of [
@@ -440,5 +447,200 @@ describe("shared JSON-RPC commands", () => {
     } finally {
       warning.mockRestore();
     }
+  });
+
+  it("resets configuration only from UI callers with explicit confirm", async () => {
+    const store = memory();
+    // Set initial configuration
+    expect(
+      await dispatch(
+        request("config.set", { prefix: "  test  " }),
+        context,
+        store,
+      ),
+    ).toHaveProperty("result.configured", true);
+    expect(
+      await dispatch(request("config.get"), context, store),
+    ).toHaveProperty("result.prefix", "test");
+
+    // UI caller with authorization can reset
+    expect(
+      await dispatch(
+        request("config.reset", { confirm: true }, "reset-ui"),
+        { source: "ui", authorized: true },
+        store,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "reset-ui",
+      result: { configured: false },
+    });
+    // Verify configuration cleared
+    expect(await dispatch(request("config.get"), context, store)).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      result: { configured: false, prefix: null },
+    });
+
+    // Reset is idempotent when already unconfigured
+    expect(
+      await dispatch(
+        request("config.reset", { confirm: true }, "reset-again"),
+        { source: "ui", authorized: true },
+        store,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "reset-again",
+      result: { configured: false },
+    });
+  });
+
+  it("rejects reset from API callers even when authorized", async () => {
+    const store = memory();
+    await dispatch(
+      request("config.set", { prefix: "api-test" }),
+      context,
+      store,
+    );
+    expect(
+      await dispatch(
+        request("config.reset", { confirm: true }, "api-reset"),
+        { source: "api", authorized: true },
+        store,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "api-reset",
+      error: { code: -32001, message: "Forbidden" },
+    });
+    // Verify configuration unchanged
+    expect(
+      await dispatch(request("config.get"), context, store),
+    ).toHaveProperty("result.prefix", "api-test");
+  });
+
+  it("rejects reset with invalid confirm parameter variations", async () => {
+    const store = memory();
+    await store.set("keep");
+    const reset = vi.spyOn(store, "reset");
+    for (const params of [
+      {},
+      { confirm: false },
+      { confirm: 1 },
+      { confirm: "true" },
+      { confirm: null },
+      { confirm: [] },
+      { confirm: {} },
+      { confirm: true, extra: "field" },
+    ]) {
+      expect(
+        await dispatch(
+          request("config.reset", params),
+          { source: "ui", authorized: true },
+          store,
+        ),
+      ).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32602, message: "Invalid params" },
+      });
+    }
+    expect(reset).not.toHaveBeenCalled();
+    expect(await store.get()).toBe("keep");
+  });
+
+  it("sanitizes storage delete failures in reset without logging details", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = {
+      get: async () => "test",
+      set: vi.fn(),
+      reset: async () => {
+        throw new Error("sensitive delete error");
+      },
+    };
+    try {
+      const response = await dispatch(
+        request("config.reset", { confirm: true }),
+        { source: "ui", authorized: true },
+        store,
+      );
+      expect(response).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32603, message: "Internal error" },
+      });
+      expect(JSON.stringify(response)).not.toContain("sensitive delete error");
+      expect(warning).not.toHaveBeenCalled();
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("allows save/reset/reconfigure cycle", async () => {
+    const store = memory();
+    const uiCaller = { source: "ui" as const, authorized: true };
+
+    // Set prefix
+    expect(
+      await dispatch(
+        request("config.set", { prefix: "first" }),
+        context,
+        store,
+      ),
+    ).toHaveProperty("result.configured", true);
+
+    // Reset
+    expect(
+      await dispatch(
+        request("config.reset", { confirm: true }, "reset1"),
+        uiCaller,
+        store,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "reset1",
+      result: { configured: false },
+    });
+
+    // Preview fails when unconfigured
+    expect(
+      await dispatch(
+        request("integration.preview", { text: "test" }, "preview1"),
+        context,
+        store,
+      ),
+    ).toHaveProperty("error.code", -32002);
+
+    // Reconfigure
+    expect(
+      await dispatch(
+        request("config.set", { prefix: "second" }),
+        context,
+        store,
+      ),
+    ).toHaveProperty("result.configured", true);
+
+    // Preview works again
+    expect(
+      await dispatch(
+        request("integration.preview", { text: "text" }, "preview2"),
+        context,
+        store,
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "preview2",
+      result: { output: "secondtext" },
+    });
+
+    // Reset again
+    expect(
+      await dispatch(
+        request("config.reset", { confirm: true }, "reset2"),
+        uiCaller,
+        store,
+      ),
+    ).toHaveProperty("result.configured", false);
   });
 });

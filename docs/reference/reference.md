@@ -1,6 +1,8 @@
 # Reference
 
-- [OpenRPC contract](openrpc.json): machine-readable JSON-RPC API declaration.
+- [OpenRPC contract](openrpc.json): machine-readable JSON-RPC declaration;
+  `config.get`, `config.set`, and `integration.preview` support UI and HTTP callers;
+  `config.reset` requires an authorized UI caller and `{ confirm: true }`.
 - [POC verification record](../../specs/deployed-poc-verification.md): local
   evidence, unverified live acceptance, release caveats, and provisional decision.
 - [Prove it from the Admin UI](../how-to/prove-admin-ui.md): installed screens,

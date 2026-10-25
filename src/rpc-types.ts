@@ -6,6 +6,10 @@ export type Commands = {
     result: { configured: boolean; prefix: string | null };
   };
   "config.set": { params: { prefix: string }; result: { configured: true } };
+  "config.reset": {
+    params: { confirm: true };
+    result: { configured: false };
+  };
   "integration.preview": {
     params: { text: string };
     result: { output: string };

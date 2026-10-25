@@ -37,6 +37,9 @@ function transport(initialPrefix?: string) {
         set: async (prefix) => {
           prefixes.set(url, prefix);
         },
+        reset: async () => {
+          prefixes.delete(url);
+        },
       },
     );
     return new Response(response.body, {
@@ -53,6 +56,126 @@ function transport(initialPrefix?: string) {
 }
 
 describe("opt-in deployed HTTP verifier (local adapter only)", () => {
+  it("emits actionable preflight diagnostics for each condition", async () => {
+    const fetcher = vi.fn();
+    const cases: Array<[Record<string, string | undefined>, string]> = [
+      [
+        { RPC_VERIFY_APPROVED: undefined },
+        "RPC_VERIFY_APPROVED must be development",
+      ],
+      [
+        { RPC_VERIFY_APPROVED: "true" },
+        "RPC_VERIFY_APPROVED must be development",
+      ],
+      [
+        { FORGE_ENVIRONMENT: "production" },
+        "FORGE_ENVIRONMENT must be development",
+      ],
+      [{ FORGE_PRODUCT: "confluence" }, "FORGE_PRODUCT must be jira"],
+      [{ FORGE_SITE: "" }, "FORGE_SITE required and must not be whitespace"],
+      [{ FORGE_SITE: "  " }, "FORGE_SITE required and must not be whitespace"],
+      [{ RPC_BEARER_SECRET: undefined }, "RPC_BEARER_SECRET required"],
+      [{ RPC_BEARER_SECRET: "" }, "RPC_BEARER_SECRET required"],
+      [
+        { RPC_BEARER_SECRET: "bad\ntoken" },
+        "RPC_BEARER_SECRET invalid bearer syntax",
+      ],
+      [
+        { RPC_BEARER_SECRET: "!@#$" },
+        "RPC_BEARER_SECRET invalid bearer syntax",
+      ],
+      [
+        { RPC_VERIFY_URL: undefined },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_URL: "" },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_URL: "http://primary.example.test/rpc" },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_URL: "not a url" },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_URL: "https://user:password@primary.example.test/rpc" },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_URL: `${primary}?token=private` },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_URL: `${primary}#private` },
+        "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment",
+      ],
+      [
+        { RPC_VERIFY_ISOLATION_URL: primary },
+        "RPC_VERIFY_ISOLATION_URL must be distinct normalized from primary",
+      ],
+      [
+        { RPC_VERIFY_ISOLATION_URL: "http://secondary.example.test/rpc" },
+        "RPC_VERIFY_ISOLATION_URL invalid HTTPS URL without credentials query or fragment",
+      ],
+    ];
+
+    for (const [overrides, expectedMessage] of cases) {
+      const report = await verifyDeployed(
+        { ...environment, ...overrides },
+        fetcher,
+      );
+      expect(report.status).toBe("failed");
+      const preflightCheck = report.checks.find((c) => c.name === "preflight");
+      expect(preflightCheck).toBeDefined();
+      expect(preflightCheck?.message).toBe(expectedMessage);
+      expect(report.configurationMayHaveChanged).toBe(false);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("never echoes malicious preflight values and compares normalized isolation URLs", async () => {
+    const fetcher = vi.fn();
+    for (const overrides of [
+      { FORGE_ENVIRONMENT: "private-target-value" },
+      { RPC_BEARER_SECRET: "private token value" },
+      {
+        RPC_VERIFY_URL:
+          "https://user:private-password@private-host.example.test/path?private-query",
+      },
+      {
+        RPC_VERIFY_ISOLATION_URL:
+          "https://private-host.example.test/path#private-fragment",
+      },
+      {
+        RPC_VERIFY_URL: "https://primary.example.test",
+        RPC_VERIFY_ISOLATION_URL: "https://PRIMARY.example.test:443/",
+      },
+    ]) {
+      const report = await verifyDeployed(
+        { ...environment, ...overrides },
+        fetcher,
+      );
+      expect(report.checks).toHaveLength(1);
+      expect(report.checks[0]?.message).toBeTruthy();
+      expect(report.status).toBe("failed");
+      expect(report.configurationMayHaveChanged).toBe(false);
+      const output = JSON.stringify(report);
+      for (const sensitive of [
+        secret,
+        primary,
+        "private-",
+        "private token",
+        "PRIMARY.example.test",
+      ]) {
+        expect(output).not.toContain(sensitive);
+      }
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("fails closed without explicit approval and valid development settings", async () => {
     const fetcher = vi.fn();
     for (const overrides of [
@@ -99,6 +222,18 @@ describe("opt-in deployed HTTP verifier (local adapter only)", () => {
       true,
     );
     expect(fetcher.mock.calls.length).toBeGreaterThan(20);
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({
+        name: "config.reset forbidden for HTTP",
+        status: "passed",
+      }),
+    );
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({
+        name: "config.get preserved after forbidden reset",
+        status: "passed",
+      }),
+    );
     const output = JSON.stringify(report);
     for (const sensitive of [secret, primary, secondary, "Authorization"]) {
       expect(output).not.toContain(sensitive);

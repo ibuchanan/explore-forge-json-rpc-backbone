@@ -18,6 +18,8 @@ Get started) and one authenticated v2 web trigger share `config.get`,
 JSON-RPC dispatcher and installation-scoped KVS store. The UI resolver checks
 Jira `ADMINISTER` permission on every call; HTTP uses a separately provisioned
 bearer secret. Preview only concatenates the saved prefix and supplied text.
+Configure also offers a confirmed, admin-only `config.reset` command to remove
+that prefix for repeat verification; HTTP callers cannot reset configuration.
 Local tests pass; deployed HTTP and installed-UI acceptance remain unverified.
 This is a proof of concept, not production-ready integration software.
 

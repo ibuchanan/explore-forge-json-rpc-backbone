@@ -6,12 +6,15 @@ const mocks = vi.hoisted(() => ({
   asUser: vi.fn(),
   get: vi.fn(),
   set: vi.fn(),
+  delete: vi.fn(),
 }));
 vi.mock("@forge/api", () => ({
   default: { asUser: mocks.asUser },
   route: (parts: TemplateStringsArray) => parts.join(""),
 }));
-vi.mock("@forge/kvs", () => ({ kvs: { get: mocks.get, set: mocks.set } }));
+vi.mock("@forge/kvs", () => ({
+  kvs: { get: mocks.get, set: mocks.set, delete: mocks.delete },
+}));
 
 import { run } from "../src/index";
 import { handler } from "../src/resolver";
@@ -35,6 +38,9 @@ const allowed = () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.data.clear();
+  mocks.delete.mockImplementation(async (key: string) => {
+    mocks.data.delete(key);
+  });
   mocks.asUser.mockReturnValue({ requestJira: mocks.requestJira });
   mocks.requestJira.mockResolvedValue(allowed());
   mocks.get.mockImplementation(async (key: string) => mocks.data.get(key));
@@ -43,7 +49,7 @@ beforeEach(() => {
   });
 });
 
-it("uses the official resolver and shares all three commands and KVS with HTTP", async () => {
+it("uses the official resolver and shares read, save and preview commands and KVS with HTTP", async () => {
   expect(await invoke(payload("config.get"))).toHaveProperty("result", {
     configured: false,
     prefix: null,
@@ -96,6 +102,47 @@ it("uses the official resolver and shares all three commands and KVS with HTTP",
   expect(mocks.asUser.mock.calls.every((args) => args.length === 0)).toBe(true);
 });
 
+it("resets only the prefix after an as-user admin permission check and supports reconfiguration", async () => {
+  mocks.data.set("unrelated.setting", "keep");
+  await invoke(payload("config.set", { prefix: "to delete" }));
+  expect(await invoke(payload("config.reset", { confirm: true }))).toEqual({
+    jsonrpc: "2.0",
+    id: "ui-request",
+    result: { configured: false },
+  });
+  expect(mocks.delete).toHaveBeenCalledExactlyOnceWith("config.prefix");
+  expect([...mocks.data.entries()]).toEqual([["unrelated.setting", "keep"]]);
+  expect(await invoke(payload("config.get"))).toHaveProperty("result", {
+    configured: false,
+    prefix: null,
+  });
+  expect(
+    await invoke(payload("integration.preview", { text: "hello" })),
+  ).toHaveProperty("error.code", -32002);
+  await invoke(payload("config.set", { prefix: "new" }));
+  expect(
+    await invoke(payload("integration.preview", { text: "hello" })),
+  ).toHaveProperty("result.output", "newhello");
+  expect(mocks.requestJira).toHaveBeenCalledWith(
+    "/rest/api/3/mypermissions?permissions=ADMINISTER",
+  );
+});
+
+it("sanitizes reset deletion errors and never deletes after an invalid confirmation", async () => {
+  mocks.data.set("config.prefix", "keep");
+  expect(
+    await invoke(payload("config.reset", { confirm: false })),
+  ).toHaveProperty("error.code", -32602);
+  expect(mocks.delete).not.toHaveBeenCalled();
+  mocks.delete.mockRejectedValueOnce(new Error("private deletion failure"));
+  expect(await invoke(payload("config.reset", { confirm: true }))).toEqual({
+    jsonrpc: "2.0",
+    id: "ui-request",
+    error: { code: -32603, message: "Internal error" },
+  });
+  expect(mocks.data.get("config.prefix")).toBe("keep");
+});
+
 it("denies every command when permission is absent, malformed, revoked or unverifiable", async () => {
   const responses = [
     { ok: false, json: async () => allowed() },
@@ -116,6 +163,7 @@ it("denies every command when permission is absent, malformed, revoked or unveri
   for (const request of [
     payload("config.get"),
     payload("config.set", { prefix: "no" }),
+    payload("config.reset", { confirm: true }),
     payload("integration.preview", { text: "no" }),
   ]) {
     for (const response of responses) {
@@ -131,6 +179,7 @@ it("denies every command when permission is absent, malformed, revoked or unveri
   }
   expect(mocks.get).not.toHaveBeenCalled();
   expect(mocks.set).not.toHaveBeenCalled();
+  expect(mocks.delete).not.toHaveBeenCalled();
   expect(await invoke(payload("config.get"))).toHaveProperty(
     "result.configured",
     false,

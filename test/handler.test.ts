@@ -7,6 +7,9 @@ vi.mock("@forge/kvs", () => ({
     set: vi.fn(async (key: string, value: string) => {
       data.set(key, value);
     }),
+    delete: vi.fn(async (key: string) => {
+      data.delete(key);
+    }),
   },
 }));
 
@@ -51,6 +54,32 @@ it("uses KVS across separate Forge handler invocations", async () => {
       ),
     ).toHaveProperty("result.output", "next");
     expect([...data.entries()]).toEqual([["config.prefix", "next"]]);
+  } finally {
+    if (previous === undefined) delete process.env["RPC_BEARER_SECRET"];
+    else process.env["RPC_BEARER_SECRET"] = previous;
+    data.clear();
+  }
+});
+
+it("forbids reset through the HTTP handler even with a valid bearer token", async () => {
+  const previous = process.env["RPC_BEARER_SECRET"];
+  process.env["RPC_BEARER_SECRET"] = "integration-test-key";
+  try {
+    // Set configuration first
+    await run(event("config.set", { prefix: "to-delete" }));
+    expect([...data.entries()]).toEqual([["config.prefix", "to-delete"]]);
+
+    // Try reset via API (should fail with Forbidden, which returns -32001)
+    const apiReset = JSON.parse(
+      (await run(event("config.reset", { confirm: true }))).body ?? "",
+    );
+    expect(apiReset).toEqual({
+      jsonrpc: "2.0",
+      id: 4,
+      error: { code: -32001, message: "Forbidden" },
+    });
+    // Configuration should still be there
+    expect([...data.entries()]).toEqual([["config.prefix", "to-delete"]]);
   } finally {
     if (previous === undefined) delete process.env["RPC_BEARER_SECRET"];
     else process.env["RPC_BEARER_SECRET"] = previous;

@@ -2,7 +2,12 @@ import { isDeepStrictEqual } from "node:util";
 
 type Environment = Record<string, string | undefined>;
 type Transport = (url: string, init: RequestInit) => Promise<Response>;
-type Check = { name: string; status: "passed" | "failed"; elapsedMs: number };
+type Check = {
+  name: string;
+  status: "passed" | "failed";
+  elapsedMs: number;
+  message?: string;
+};
 
 const request = (
   method: string,
@@ -54,7 +59,11 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     ui: "unverified" as const,
     checks: [] as Check[],
   };
-  async function check(name: string, action: () => void | Promise<void>) {
+  async function check(
+    name: string,
+    action: () => void | Promise<void>,
+    messageSupplier?: () => string | undefined,
+  ) {
     const start = performance.now();
     try {
       await action();
@@ -64,10 +73,12 @@ export async function verifyDeployed(env: Environment, send: Transport) {
         elapsedMs: performance.now() - start,
       });
     } catch {
+      const message = messageSupplier?.();
       report.checks.push({
         name,
         status: "failed",
         elapsedMs: performance.now() - start,
+        ...(message && { message }),
       });
       // Do not expose assertion diffs, fetch errors, URLs, headers, or bodies.
       throw new Error("Verification failed");
@@ -77,23 +88,73 @@ export async function verifyDeployed(env: Environment, send: Transport) {
     let url = "";
     let isolationUrl: string | undefined;
     const secret = env["RPC_BEARER_SECRET"] ?? "";
-    await check("preflight", () => {
-      if (
-        env["RPC_VERIFY_APPROVED"] !== "development" ||
-        env["FORGE_ENVIRONMENT"] !== "development" ||
-        env["FORGE_PRODUCT"] !== "jira" ||
-        !env["FORGE_SITE"] ||
-        !/^[A-Za-z0-9._~+/-]+={0,2}$/.test(secret)
-      ) {
-        throw new Error("Development approval and settings required");
-      }
-      url = endpoint(env["RPC_VERIFY_URL"]);
-      if (env["RPC_VERIFY_ISOLATION_URL"] !== undefined) {
-        isolationUrl = endpoint(env["RPC_VERIFY_ISOLATION_URL"]);
-        if (isolationUrl === url)
-          throw new Error("Distinct installations required");
-      }
-    });
+
+    // Sequential preflight validations with actionable diagnostics
+    let preflightMessage: string | undefined;
+    await check(
+      "preflight",
+      () => {
+        // RPC_VERIFY_APPROVED must be "development"
+        if (env["RPC_VERIFY_APPROVED"] !== "development") {
+          preflightMessage = "RPC_VERIFY_APPROVED must be development";
+          throw new Error();
+        }
+
+        // FORGE_ENVIRONMENT must be "development"
+        if (env["FORGE_ENVIRONMENT"] !== "development") {
+          preflightMessage = "FORGE_ENVIRONMENT must be development";
+          throw new Error();
+        }
+
+        // FORGE_PRODUCT must be "jira"
+        if (env["FORGE_PRODUCT"] !== "jira") {
+          preflightMessage = "FORGE_PRODUCT must be jira";
+          throw new Error();
+        }
+
+        // FORGE_SITE must be non-blank
+        if (!env["FORGE_SITE"]?.trim()) {
+          preflightMessage = "FORGE_SITE required and must not be whitespace";
+          throw new Error();
+        }
+
+        // RPC_BEARER_SECRET must be non-empty and valid bearer syntax
+        if (!secret) {
+          preflightMessage = "RPC_BEARER_SECRET required";
+          throw new Error();
+        }
+        if (!/^[A-Za-z0-9._~+/-]+={0,2}$/.test(secret)) {
+          preflightMessage = "RPC_BEARER_SECRET invalid bearer syntax";
+          throw new Error();
+        }
+
+        // RPC_VERIFY_URL required and valid HTTPS without credentials, query, fragment
+        try {
+          url = endpoint(env["RPC_VERIFY_URL"]);
+        } catch {
+          preflightMessage =
+            "RPC_VERIFY_URL required valid HTTPS URL without credentials query or fragment";
+          throw new Error();
+        }
+
+        // Optional RPC_VERIFY_ISOLATION_URL same validation and must be distinct
+        if (env["RPC_VERIFY_ISOLATION_URL"] !== undefined) {
+          try {
+            isolationUrl = endpoint(env["RPC_VERIFY_ISOLATION_URL"]);
+          } catch {
+            preflightMessage =
+              "RPC_VERIFY_ISOLATION_URL invalid HTTPS URL without credentials query or fragment";
+            throw new Error();
+          }
+          if (isolationUrl === url) {
+            preflightMessage =
+              "RPC_VERIFY_ISOLATION_URL must be distinct normalized from primary";
+            throw new Error();
+          }
+        }
+      },
+      () => preflightMessage,
+    );
     const invalidToken = `${secret.replace(/=+$/, "")}-invalid`;
     const authorization = `Bearer ${secret}`;
     async function probe(
@@ -254,6 +315,16 @@ export async function verifyDeployed(env: Environment, send: Transport) {
       "config.get persisted",
       request("config.get", {}, "read-back"),
       result("read-back", { configured: true, prefix }),
+    );
+    await probe(
+      "config.reset forbidden for HTTP",
+      request("config.reset", { confirm: true }, "reset-denied"),
+      error("reset-denied", -32001, "Forbidden"),
+    );
+    await probe(
+      "config.get preserved after forbidden reset",
+      request("config.get", {}, "reset-read-back"),
+      result("reset-read-back", { configured: true, prefix }),
     );
     for (const text of [" hello 😀\n<b>text</b>", "", "😀".repeat(2000)]) {
       await probe(

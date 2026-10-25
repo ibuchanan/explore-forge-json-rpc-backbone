@@ -87,6 +87,9 @@ const respond = (_key: string, request: unknown) =>
       set: async (value) => {
         prefix = value;
       },
+      reset: async () => {
+        prefix = undefined;
+      },
     },
   );
 
@@ -233,6 +236,160 @@ it("loads, saves normalized data, previews saved rather than edited prefix, and 
     ),
   ).toBe(true);
 });
+
+it("requires reset confirmation, supports cancellation, and verifies reset before reconfiguration", async () => {
+  prefix = "saved";
+  await mount();
+  await change("TextArea", " sample");
+  await submit(1);
+  const calls = bridge.invoke.mock.calls.length;
+  await click("Reset configuration");
+  expect(bridge.invoke).toHaveBeenCalledTimes(calls);
+  expect(text()).toContain("Remove the saved prefix?");
+  expect(text()).toContain("cannot be undone");
+  expect(nodes("Textfield")[0]?.props["isDisabled"]).toBe(true);
+  await click("Cancel");
+  expect(prefix).toBe("saved");
+  expect(bridge.invoke).toHaveBeenCalledTimes(calls);
+  await click("Reset configuration");
+  await click("Confirm reset");
+  expect(
+    bridge.invoke.mock.calls
+      .slice(-2)
+      .map(([, request]) => [request.method, request.params]),
+  ).toEqual([
+    ["config.reset", { confirm: true }],
+    ["config.get", {}],
+  ]);
+  expect(prefix).toBeUndefined();
+  expect(text()).toContain("Configuration reset");
+  expect(text()).toContain("Not configured");
+  expect(nodes("CodeBlock")).toHaveLength(0);
+  expect(nodes("Textfield")[0]?.props["defaultValue"]).toBe("");
+  expect(nodes("TextArea")[0]?.props["defaultValue"]).toBe("");
+  expect(nodes("TextArea")[0]?.props["isDisabled"]).toBe(true);
+  await change("Textfield", "new");
+  await submit(0);
+  await change("TextArea", " sample");
+  await submit(1);
+  expect(nodes("CodeBlock")[0]?.props["text"]).toBe("new sample");
+});
+
+it("blocks duplicate resets and other actions during reset and its read-back", async () => {
+  prefix = "saved";
+  await mount();
+  await click("Reset configuration");
+  const confirm = nodes("Button").find(
+    (node) => node.props["children"] === "Confirm reset",
+  )?.props["onClick"];
+  const response = deferred<Awaited<ReturnType<typeof dispatch>>>();
+  bridge.invoke.mockReturnValueOnce(response.promise);
+  await click("Confirm reset");
+  expect(nodes("Spinner")[0]?.props["label"]).toBe(
+    "Resetting configuration and verifying",
+  );
+  expect(nodes("Lozenge")).toHaveLength(0);
+  expect(nodes("Button").every((node) => node.props["isDisabled"])).toBe(true);
+  const calls = bridge.invoke.mock.calls.length;
+  await act(async () => {
+    confirm?.();
+  });
+  await submit(0);
+  await submit(1);
+  expect(bridge.invoke).toHaveBeenCalledTimes(calls);
+  const readBack = deferred<Awaited<ReturnType<typeof dispatch>>>();
+  bridge.invoke.mockReturnValueOnce(readBack.promise);
+  await act(async () => {
+    prefix = undefined;
+    response.resolve({
+      jsonrpc: "2.0",
+      id: bridge.invoke.mock.calls[calls - 1]?.[1].id,
+      result: { configured: false },
+    });
+  });
+  expect(nodes("Spinner")).toHaveLength(1);
+  expect(text()).not.toContain("Configuration reset");
+  await act(async () => {
+    readBack.resolve({
+      jsonrpc: "2.0",
+      id: bridge.invoke.mock.calls.at(-1)?.[1].id,
+      result: { configured: false, prefix: null },
+    });
+  });
+  expect(text()).toContain("Configuration reset");
+});
+
+it.each([
+  "delete failure",
+  "read-back failure",
+  "read-back mismatch",
+  "permission denied",
+])(
+  "shows sanitized uncertain state and offers a read retry on %s",
+  async (failure) => {
+    prefix = "private saved prefix";
+    await mount();
+    await submit(1);
+    await click("Reset configuration");
+    if (failure === "delete failure")
+      bridge.invoke.mockRejectedValueOnce(
+        new Error("private delete exception"),
+      );
+    else if (failure === "permission denied")
+      bridge.invoke.mockImplementationOnce(async (_key, request) => ({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: { code: -32001, message: "Forbidden" },
+      }));
+    else {
+      bridge.invoke.mockImplementationOnce(respond);
+      if (failure === "read-back failure")
+        bridge.invoke.mockRejectedValueOnce(
+          new Error("private read exception"),
+        );
+      else
+        bridge.invoke.mockImplementationOnce(async (_key, request) => ({
+          jsonrpc: "2.0",
+          id: request.id,
+          result: { configured: true, prefix: "private concurrent write" },
+        }));
+    }
+    await click("Confirm reset");
+    expect(text()).not.toContain("private");
+    expect(text()).not.toContain("Configuration reset");
+    expect(nodes("Lozenge")).toHaveLength(0);
+    expect(nodes("CodeBlock")).toHaveLength(0);
+    expect(nodes("Textfield")[0]?.props["defaultValue"]).toBe("");
+    expect(nodes("Textfield")[0]?.props["isDisabled"]).toBe(true);
+    expect(text()).toContain(
+      failure.startsWith("read-back")
+        ? "Configuration was reset, but read-back verification failed"
+        : "Reset could not be confirmed",
+    );
+    const resets = bridge.invoke.mock.calls.filter(
+      ([, request]) => request.method === "config.reset",
+    ).length;
+    await click("Retry");
+    expect(
+      bridge.invoke.mock.calls.filter(
+        ([, request]) => request.method === "config.reset",
+      ),
+    ).toHaveLength(resets);
+  },
+);
+
+it.each(["status", "get-started"] as const)(
+  "%s does not offer destructive reset",
+  async (page) => {
+    prefix = "saved";
+    await mount(page);
+    expect(
+      nodes("Button").some(
+        (node) => node.props["children"] === "Reset configuration",
+      ),
+    ).toBe(false);
+  },
+);
 
 it("matches Unicode command boundaries without UTF-16 maxLength constraints", async () => {
   await mount();

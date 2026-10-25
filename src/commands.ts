@@ -10,6 +10,7 @@ import {
 export interface PrefixStore {
   get(): Promise<string | undefined>;
   set(prefix: string): Promise<void>;
+  reset(): Promise<void>;
 }
 
 export type Caller = { source: "api" | "ui"; authorized: boolean };
@@ -52,6 +53,15 @@ server.addMethod("config.set", async (params, { store }) => {
   if (!prefix || [...prefix].length > 64) invalidParams();
   await store.set(prefix);
   return { configured: true };
+});
+server.addMethod("config.reset", async (params, { caller, store }) => {
+  if (!object(params, ["confirm"]) || params["confirm"] !== true)
+    invalidParams();
+  if (caller.source !== "ui") {
+    throw new JSONRPCErrorException("Forbidden", -32001);
+  }
+  await store.reset();
+  return { configured: false };
 });
 
 server.addMethod("integration.preview", async (params, { store }) => {
