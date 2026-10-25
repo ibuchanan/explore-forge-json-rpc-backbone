@@ -53,6 +53,7 @@ describe("OpenRPC contract", () => {
     expect(contract.methods.map(({ name }: { name: string }) => name)).toEqual([
       "config.get",
       "config.set",
+      "integration.preview",
     ]);
     expect(
       contract.methods.every(
@@ -60,6 +61,54 @@ describe("OpenRPC contract", () => {
           paramStructure === "by-name",
       ),
     ).toBe(true);
+  });
+
+  it("preview schemas and documented errors match runtime behavior", async () => {
+    const preview = contract.methods.find(
+      ({ name }: { name: string }) => name === "integration.preview",
+    );
+    expect(preview.params).toHaveLength(1);
+    expect(preview.params[0]).toMatchObject({ name: "text", required: true });
+    const validText = ajv.compile(preview.params[0].schema);
+    for (const [text, valid] of [
+      ["", true],
+      ["😀".repeat(2000), true],
+      ["😀".repeat(2001), false],
+      ["a".repeat(2001), false],
+      [null, false],
+      [1, false],
+    ] as const) {
+      expect(validText(text)).toBe(valid);
+    }
+    const validResult = ajv.compile(preview.result.schema);
+    expect(validResult({ output: "hi" })).toBe(true);
+    expect(validResult({ output: 1 })).toBe(false);
+    expect(validResult({})).toBe(false);
+    expect(validResult({ output: "hi", extra: true })).toBe(false);
+
+    const storage = store();
+    for (const [params, authorized, errorName] of [
+      [{ text: "hello" }, true, "NotConfigured"],
+      [{}, true, "InvalidParams"],
+      [{ text: "hello", prefix: "override" }, true, "InvalidParams"],
+      [{ text: "😀".repeat(2001) }, true, "InvalidParams"],
+      [{ text: "hello" }, false, "Forbidden"],
+    ] as const) {
+      expect(preview.errors).toContainEqual({
+        $ref: `#/components/errors/${errorName}`,
+      });
+      expect(
+        await dispatch(
+          { jsonrpc: "2.0", method: preview.name, params, id: "preview" },
+          { ...caller, authorized },
+          storage,
+        ),
+      ).toEqual({
+        jsonrpc: "2.0",
+        id: "preview",
+        error: contract.components.errors[errorName],
+      });
+    }
   });
 
   it("method parameter and result shapes agree with actual examples", async () => {

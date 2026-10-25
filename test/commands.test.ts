@@ -36,6 +36,74 @@ const memory = (): PrefixStore => {
 };
 
 describe("shared JSON-RPC commands", () => {
+  it("reports not configured when preview is requested before setup", async () => {
+    expect(
+      await dispatch(
+        request("integration.preview", { text: "hello" }, "preview-unset"),
+        context,
+        memory(),
+      ),
+    ).toEqual({
+      jsonrpc: "2.0",
+      id: "preview-unset",
+      error: { code: -32002, message: "Not configured" },
+    });
+  });
+
+  it("previews exact text and Unicode boundaries without changing configuration", async () => {
+    const store = memory();
+    await dispatch(request("config.set", { prefix: "  hi  " }), context, store);
+    for (const source of ["api", "ui"] as const) {
+      for (const [text, output] of [
+        ["", "hi"],
+        [" there 😀\n", "hi there 😀\n"],
+        ["e\u0301", "hie\u0301"],
+        ["a".repeat(2000), `hi${"a".repeat(2000)}`],
+        ["😀".repeat(2000), `hi${"😀".repeat(2000)}`],
+      ]) {
+        expect(
+          await dispatch(
+            request("integration.preview", { text }, "preview"),
+            { source, authorized: true },
+            store,
+          ),
+        ).toEqual({ jsonrpc: "2.0", id: "preview", result: { output } });
+      }
+    }
+    expect(
+      await dispatch(request("config.get"), context, store),
+    ).toHaveProperty("result.prefix", "hi");
+  });
+
+  it("rejects invalid preview params before reading configuration", async () => {
+    const store = {
+      get: vi.fn(async () => undefined),
+      set: vi.fn(async () => {}),
+    };
+    for (const params of [
+      {},
+      { text: null },
+      { text: 7 },
+      { text: false },
+      { text: [] },
+      { text: {} },
+      { text: "hello", prefix: "client override" },
+      { text: "hello", caller: { authorized: true } },
+      { text: "a".repeat(2001) },
+      { text: "😀".repeat(2001) },
+    ]) {
+      expect(
+        await dispatch(request("integration.preview", params), context, store),
+      ).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32602, message: "Invalid params" },
+      });
+    }
+    expect(store.get).not.toHaveBeenCalled();
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
   it("returns unconfigured state before setup", async () => {
     expect(await dispatch(request("config.get"), context, memory())).toEqual({
       jsonrpc: "2.0",
@@ -231,6 +299,15 @@ describe("shared JSON-RPC commands", () => {
       { ...request("config.get"), id: Infinity },
       { ...request("config.get"), actor: "admin" },
       { ...request("config.get"), jsonrpc: "1.0" },
+      [request("integration.preview", { text: "hello" })],
+      {
+        jsonrpc: "2.0",
+        method: "integration.preview",
+        params: { text: "hello" },
+      },
+      { ...request("integration.preview", { text: "hello" }), id: null },
+      { ...request("integration.preview"), params: ["hello"] },
+      { ...request("integration.preview", { text: "hello" }), caller: context },
     ];
     const envelope = request("config.set", { prefix: "must not be saved" });
     const invalidEnvelope: fc.Arbitrary<unknown> = fc.oneof(
@@ -302,6 +379,19 @@ describe("shared JSON-RPC commands", () => {
         store,
       ),
     ).toHaveProperty("error.code", -32001);
+    for (const source of ["api", "ui"] as const) {
+      expect(
+        await dispatch(
+          request("integration.preview", { text: "hello" }),
+          { source, authorized: false },
+          store,
+        ),
+      ).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32001, message: "Forbidden" },
+      });
+    }
     expect(store.get).not.toHaveBeenCalled();
     expect(await dispatch(request("unknown"), context, store)).toHaveProperty(
       "error.code",
@@ -334,13 +424,18 @@ describe("shared JSON-RPC commands", () => {
       set: vi.fn(),
     };
     try {
-      const response = await dispatch(request("config.get"), context, store);
-      expect(response).toEqual({
-        jsonrpc: "2.0",
-        id: 1,
-        error: { code: -32603, message: "Internal error" },
-      });
-      expect(JSON.stringify(response)).not.toContain("sensitive details");
+      for (const payload of [
+        request("config.get"),
+        request("integration.preview", { text: "hello" }),
+      ]) {
+        const response = await dispatch(payload, context, store);
+        expect(response).toEqual({
+          jsonrpc: "2.0",
+          id: 1,
+          error: { code: -32603, message: "Internal error" },
+        });
+        expect(JSON.stringify(response)).not.toContain("sensitive details");
+      }
       expect(warning).not.toHaveBeenCalled();
     } finally {
       warning.mockRestore();

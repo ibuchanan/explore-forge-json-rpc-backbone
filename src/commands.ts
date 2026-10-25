@@ -19,7 +19,7 @@ type CommandContext = { caller: Caller; store: PrefixStore };
 const server = new JSONRPCServer<CommandContext>({ errorListener: () => {} });
 server.mapErrorToJSONRPCErrorResponse = (id, error: unknown) =>
   error instanceof JSONRPCErrorException &&
-  (error.code === -32602 || error.code === -32001)
+  (error.code === -32602 || error.code === -32001 || error.code === -32002)
     ? createJSONRPCErrorResponse(id, error.code, error.message)
     : createJSONRPCErrorResponse(
         id,
@@ -52,6 +52,17 @@ server.addMethod("config.set", async (params, { store }) => {
   if (!prefix || [...prefix].length > 64) invalidParams();
   await store.set(prefix);
   return { configured: true };
+});
+
+server.addMethod("integration.preview", async (params, { store }) => {
+  if (!object(params, ["text"]) || typeof params["text"] !== "string")
+    invalidParams();
+  const text = params["text"] as string;
+  if ([...text].length > 2000) invalidParams();
+  const prefix = await store.get();
+  if (prefix === undefined)
+    throw new JSONRPCErrorException("Not configured", -32002);
+  return { output: prefix + text };
 });
 
 export const rpcError = (

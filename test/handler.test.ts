@@ -38,7 +38,19 @@ it("uses KVS across separate Forge handler invocations", async () => {
     expect(
       JSON.parse((await run(event("config.get", {}))).body ?? ""),
     ).toHaveProperty("result.prefix", "test");
-    expect([...data.values()]).toEqual(["test"]);
+    expect(
+      JSON.parse(
+        (await run(event("integration.preview", { text: " hello 😀" }))).body ??
+          "",
+      ),
+    ).toEqual({ jsonrpc: "2.0", id: 4, result: { output: "test hello 😀" } });
+    await run(event("config.set", { prefix: "next" }));
+    expect(
+      JSON.parse(
+        (await run(event("integration.preview", { text: "" }))).body ?? "",
+      ),
+    ).toHaveProperty("result.output", "next");
+    expect([...data.entries()]).toEqual([["config.prefix", "next"]]);
   } finally {
     if (previous === undefined) delete process.env["RPC_BEARER_SECRET"];
     else process.env["RPC_BEARER_SECRET"] = previous;

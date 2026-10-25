@@ -56,6 +56,71 @@ describe("public web trigger boundary", () => {
     });
   });
 
+  it("previews the current saved prefix across separate HTTP requests", async () => {
+    const store = memory();
+    const execute = async (method: string, params: object) => {
+      const response = await handleHttp(
+        makeEvent(undefined, JSON.stringify(request(method, params))),
+        secret,
+        store,
+      );
+      expect(response.statusCode).toBe(200);
+      return body(response);
+    };
+    expect(await execute("integration.preview", { text: "hello" })).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      error: { code: -32002, message: "Not configured" },
+    });
+    expect(await execute("config.set", { prefix: "  hi  " })).toHaveProperty(
+      "result.configured",
+      true,
+    );
+    for (const [text, output] of [
+      [" there 😀", "hi there 😀"],
+      ["", "hi"],
+      [" \n", "hi \n"],
+      ["😀".repeat(2000), `hi${"😀".repeat(2000)}`],
+    ]) {
+      expect(await execute("integration.preview", { text })).toEqual({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { output },
+      });
+    }
+    for (const params of [
+      {},
+      { text: 1 },
+      { text: "hello", prefix: "override" },
+      { text: "😀".repeat(2001) },
+    ]) {
+      expect(await execute("integration.preview", params)).toHaveProperty(
+        "error.code",
+        -32602,
+      );
+    }
+    expect(await execute("config.get", {})).toHaveProperty(
+      "result.prefix",
+      "hi",
+    );
+    await execute("config.set", { prefix: "bye" });
+    expect(
+      await execute("integration.preview", { text: " there" }),
+    ).toHaveProperty("result.output", "bye there");
+    expect(
+      body(
+        await handleHttp(
+          makeEvent(
+            undefined,
+            JSON.stringify(request("integration.preview", { text: "hello" })),
+          ),
+          secret,
+          memory(),
+        ),
+      ),
+    ).toHaveProperty("error.code", -32002);
+  });
+
   it("accepts case-insensitive header names and JSON media types", async () => {
     await fc.assert(
       fc.asyncProperty(
@@ -119,16 +184,21 @@ describe("public web trigger boundary", () => {
           get: vi.fn(async () => undefined),
           set: vi.fn(async () => {}),
         };
-        const response = await handleHttp(
-          makeEvent({
-            "Content-Type": ["application/json"],
-            ...authorization,
-          }),
-          secret,
-          store,
-        );
-        expect(response.statusCode).toBe(401);
-        expect(JSON.stringify(response)).not.toContain(secret);
+        for (const payload of [
+          request("config.get"),
+          request("integration.preview", { text: "hello" }),
+        ]) {
+          const response = await handleHttp(
+            makeEvent(
+              { "Content-Type": ["application/json"], ...authorization },
+              JSON.stringify(payload),
+            ),
+            secret,
+            store,
+          );
+          expect(response.statusCode).toBe(401);
+          expect(JSON.stringify(response)).not.toContain(secret);
+        }
         expect(store.get).not.toHaveBeenCalled();
         expect(store.set).not.toHaveBeenCalled();
       }),
