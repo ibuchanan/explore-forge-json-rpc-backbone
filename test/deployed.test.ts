@@ -58,15 +58,24 @@ function transport(initialPrefix?: string) {
 
 describe("opt-in deployed HTTP verifier (local adapter only)", () => {
   it("keeps real narrative output on stderr and the JSON report alone on stdout", () => {
-    const run = spawnSync("bun", ["run", "-"], {
-      input: `
+    const run = spawnSync(
+      "node",
+      [
+        "--disable-warning=ExperimentalWarning",
+        "--experimental-strip-types",
+        "--input-type=module",
+        "-",
+      ],
+      {
+        input: `
           import { verifyDeployed } from "./test/deployed/verify.ts";
           const report = await verifyDeployed({}, async () => { throw new Error("must not call HTTP"); });
           console.log(JSON.stringify(report));
         `,
-      encoding: "utf8",
-      env: { ...process.env, LOG_LEVEL: "info", FORGE_LOG_PRETTY: "false" },
-    });
+        encoding: "utf8",
+        env: { ...process.env, LOG_LEVEL: "info", FORGE_LOG_PRETTY: "false" },
+      },
+    );
     expect(run.status).toBe(0);
     const report = JSON.parse(run.stdout);
     expect(report.status).toBe("failed");

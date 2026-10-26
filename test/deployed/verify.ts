@@ -6,7 +6,7 @@ import {
   commandNames,
   type CommandName,
   type Commands,
-} from "../../src/generated/commands";
+} from "../../src/generated/commands.ts";
 
 type Environment = Record<string, string | undefined>;
 type Transport = (url: string, init: RequestInit) => Promise<Response>;

@@ -13,4 +13,4 @@ fi
 if [ -z "${RPC_VERIFY_ISOLATION_URL-}" ]; then
   unset RPC_VERIFY_ISOLATION_URL
 fi
-exec bun run test/deployed/run.ts
+exec node --experimental-strip-types test/deployed/run.ts

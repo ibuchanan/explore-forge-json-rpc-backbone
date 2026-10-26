@@ -5,7 +5,7 @@ import {
   type Document,
   generate,
   generateValidators,
-} from "./command-contracts";
+} from "./command-contracts.ts";
 
 const args = process.argv.slice(2);
 const check = args.includes("--check");
@@ -40,7 +40,7 @@ for (const [path, content] of [
     }
     if (current !== formatted) {
       console.error(
-        "Generated command contract is stale; run bun run generate:commands.",
+        "Generated command contract is stale; run npm run generate:commands.",
       );
       process.exitCode = 1;
     }

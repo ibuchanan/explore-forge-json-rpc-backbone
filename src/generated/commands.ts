@@ -1,6 +1,6 @@
 import type { Result } from "@forge-ahead/errors";
 // Generated from docs/reference/openrpc.json; do not edit.
-// Regenerate: bun run generate:commands
+// Regenerate: npm run generate:commands
 
 export interface Commands {
   "config.get": {

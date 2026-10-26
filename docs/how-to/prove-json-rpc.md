@@ -434,7 +434,7 @@ These requests never invoke an RPC.
 
 #### Inspect the local native contract narrative
 
-Run `bun run test -- test/native-outcomes.test.ts` for the local product-event
+Run `npm run test -- test/native-outcomes.test.ts` for the local product-event
 contract proof. Tests capture the existing logger in memory and assert its
 narrative; they do not invoke a deployed native handler or inspect backend logs.
 Consult the [metadata reference](../reference/reference.md#logging-and-deployed-verification)

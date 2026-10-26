@@ -164,34 +164,39 @@ describe("OpenRPC contract generation", () => {
       const output = resolve(directory, "commands.ts");
       const contract = document();
       writeFileSync(input, JSON.stringify(contract));
-      const args = ["run", "scripts/generate-commands.ts", input, output];
-      execFileSync("bun", args);
+      const args = [
+        "--experimental-strip-types",
+        "scripts/generate-commands.ts",
+        input,
+        output,
+      ];
+      execFileSync("node", args);
       const original = readFileSync(output, "utf8");
       const validators = output.replace(/\.ts$/, ".validators.js");
       const originalValidators = readFileSync(validators, "utf8");
       writeFileSync(validators, "// stale validator");
-      const staleValidators = spawnSync("bun", [...args, "--check"], {
+      const staleValidators = spawnSync("node", [...args, "--check"], {
         encoding: "utf8",
       });
       expect(staleValidators.status).toBe(1);
       expect(readFileSync(validators, "utf8")).toBe("// stale validator");
-      execFileSync("bun", args);
+      execFileSync("node", args);
       expect(readFileSync(validators, "utf8")).toBe(originalValidators);
       expect(original).toContain("export interface Commands");
-      execFileSync("bun", [...args, "--check"]);
+      execFileSync("node", [...args, "--check"]);
       contract.methods.push({ ...contract.methods[0], name: "config.inspect" });
       writeFileSync(input, JSON.stringify(contract));
-      const stale = spawnSync("bun", [...args, "--check"], {
+      const stale = spawnSync("node", [...args, "--check"], {
         encoding: "utf8",
       });
       expect(stale.status).toBe(1);
       expect(stale.stderr).toMatch(/stale.*generate:commands/i);
       expect(readFileSync(output, "utf8")).toBe(original);
-      execFileSync("bun", args);
+      execFileSync("node", args);
       expect(readFileSync(output, "utf8")).toContain('"config.inspect"');
-      execFileSync("bun", [...args, "--check"]);
+      execFileSync("node", [...args, "--check"]);
       const regenerated = readFileSync(output, "utf8");
-      execFileSync("bun", args);
+      execFileSync("node", args);
       expect(readFileSync(output, "utf8")).toBe(regenerated);
     } finally {
       rmSync(directory, { recursive: true, force: true });

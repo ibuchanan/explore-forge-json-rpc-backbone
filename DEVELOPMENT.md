@@ -2,8 +2,7 @@
 
 <!-- cspell:words webtrigger openrpc -->
 
-Install dependencies with `npm install`. Forge wrappers also require Bun
-1.4.3+, SecretSpec 0.21.1+, and an authenticated Forge CLI on `PATH`.
+Install dependencies with `npm install`. App generation, tests, and checks use Node/npm. The upstream Fence Rider CLI still requires Bun 1.4.3+ for optional Forge lifecycle wrappers; those operations also require SecretSpec 0.21.1+ and an authenticated Forge CLI on `PATH`.
 The `fence-rider` development dependency is installed from GitHub.
 Use the [Fence Rider documentation][fence-rider-docs] for the shared workflow
 and provider background. The instructions below apply its
@@ -233,7 +232,7 @@ Check the full profile and selected runtime names without printing values:
 ```sh
 secretspec check --profile default --scope '' --explain
 secretspec check --profile default --scope runtime --json
-SECRETSPEC_PROFILE=default bun run fence-rider doctor --resolve
+SECRETSPEC_PROFILE=default fence-rider doctor --resolve
 ```
 
 These commands may access the provider or request authentication. Expect all
@@ -246,8 +245,8 @@ Storing the token locally does not provision Forge. With explicit approval for
 the registered app and development environment, upload and deploy:
 
 ```sh
-SECRETSPEC_PROFILE=default bun run forge:variables:set --environment development &&
-  SECRETSPEC_PROFILE=default bun run forge:deploy --environment development
+SECRETSPEC_PROFILE=default npm run forge:variables:set -- --environment development &&
+  SECRETSPEC_PROFILE=default npm run forge:deploy -- --environment development
 ```
 
 Use the same target for both commands. `forge:variables:set` uploads only the
@@ -262,10 +261,10 @@ After editing `docs/reference/openrpc.json`, regenerate the tracked contract and
 check its consumers:
 
 ```sh
-bun run generate:commands
-bun run generate:commands:check
-bun run typecheck
-bun run test -- test/generation.test.ts test/contract.test.ts
+npm run generate:commands
+npm run generate:commands:check
+npm run typecheck
+npm run test -- test/generation.test.ts test/contract.test.ts
 ```
 
 Do not edit `src/generated/commands.ts` or `src/generated/commands.validators.js`
@@ -275,8 +274,8 @@ map in `src/executor.ts`; regeneration does not create handler bodies or grant
 permissions. A missing handler fails typecheck after generation. Keep runtime
 normalization and validation tests when changing schemas.
 
-Use `bun run generate:commands:check` for read-only drift detection. It exits
-nonzero for missing or stale output without rewriting files. `bun run check`
+Use `npm run generate:commands:check` for read-only drift detection. It exits
+nonzero for missing or stale output without rewriting files. `npm run check`
 includes this check; it does not regenerate or accept changed artifacts silently.
 The [contract reference](docs/reference/reference.md#generated-contract) defines
 the supported schema subset and remaining runtime checks.
@@ -305,7 +304,7 @@ If formatting races with a generator's temporary validator artifact, run the
 same pipeline serially; do not skip checks or accept generated drift:
 
 ```sh
-bun run check -- --max-parallel 1
+npm run check -- --max-parallel 1
 ```
 
 Shared tooling validation is documented upstream. This app no longer includes

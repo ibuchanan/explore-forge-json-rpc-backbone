@@ -1,8 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildSync } from "esbuild";
 import Ajv, { type AnySchema } from "ajv";
-import standaloneCode from "ajv/dist/standalone";
+import standaloneCode from "ajv/dist/standalone/index.js";
 import { compile } from "json-schema-to-typescript";
 
 // Build-time only: the app imports the generated contract, never this compiler.
@@ -105,11 +105,16 @@ export const validOutput = (method, value) => outputValidators[method](value);`;
   try {
     const input = resolve(directory, "validators.js");
     writeFileSync(input, source);
-    return `// Generated from docs/reference/openrpc.json by Ajv; do not edit.\n// Regenerate: bun run generate:commands\n${execFileSync(
-      "bun",
-      ["build", input, "--target=browser", "--format=esm", "--minify"],
-      { encoding: "utf8" },
-    )}`;
+    return `// Generated from docs/reference/openrpc.json by Ajv; do not edit.\n// Regenerate: npm run generate:commands\n${
+      buildSync({
+        entryPoints: [input],
+        bundle: true,
+        format: "esm",
+        minify: true,
+        platform: "browser",
+        write: false,
+      }).outputFiles[0]?.text ?? ""
+    }`;
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -174,7 +179,7 @@ export async function generate(document: Document): Promise<string> {
     "Commands",
     {
       bannerComment:
-        "// Generated from docs/reference/openrpc.json; do not edit.\n// Regenerate: bun run generate:commands",
+        "// Generated from docs/reference/openrpc.json; do not edit.\n// Regenerate: npm run generate:commands",
       $refOptions: { resolve: { file: false, http: false } },
       enableConstEnums: false,
       unknownAny: true,

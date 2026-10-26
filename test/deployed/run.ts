@@ -1,4 +1,4 @@
-import { verifyDeployed } from "./verify";
+import { verifyDeployed } from "./verify.ts";
 
 const report = await verifyDeployed(process.env, (url, init) =>
   fetch(url, init),

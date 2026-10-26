@@ -81,9 +81,9 @@ printf '%s\\n' "\${FAKE_FORGE_OUTPUT-$FAKE_URL}"
 `,
   );
   tool(
-    "bun",
+    "node",
     `
-[ "$*" = 'run test/deployed/run.ts' ]
+[ "$*" = '--experimental-strip-types test/deployed/run.ts' ]
 [ "$RPC_BEARER_SECRET" = synthetic-test-token ]
 [ "$RPC_VERIFY_URL" = "$FAKE_URL" ]
 [ -z "\${RPC_VERIFY_ISOLATION_URL+x}" ]

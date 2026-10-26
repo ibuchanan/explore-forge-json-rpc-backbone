@@ -101,7 +101,7 @@ registered once from generated `commandNames`, with no legacy handler path or fa
 with the installed Biome version and owns the tracked `src/generated/commands.ts`
 and `src/generated/commands.validators.js`. The latter contains standalone Ajv
 8.20.0 output validators, including its small Unicode length helper bundled by
-Bun. Ajv remains a dev dependency; no runtime schema compiler or external module
+esbuild. Ajv remains a dev dependency; no runtime schema compiler or external module
 resolution is required by these validators. The same read-only drift check covers
 both artifacts.
 
