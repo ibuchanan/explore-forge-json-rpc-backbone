@@ -1,5 +1,6 @@
 import { makeInvoke } from "@forge/bridge";
 import type { Commands, TypedCaller } from "../generated/commands";
+import { rpcErrors } from "../rpc-errors";
 import type { RpcDefinitions, RpcRequest } from "../rpc-types";
 
 const invoke = makeInvoke<RpcDefinitions>();
@@ -32,11 +33,12 @@ export const rpc: TypedCaller = async <M extends keyof Commands>(
 
 export function failureMessage(error: unknown): string {
   if (error instanceof RpcFailure) {
-    if (error.code === -32001)
+    if (error.code === rpcErrors.forbidden.code)
       return "Jira administrator access and a successful permission check are required. Check your access, then retry.";
-    if (error.code === -32002)
+    if (error.code === rpcErrors["not-configured"].code)
       return "Not configured. Save a prefix, then run the preview again.";
-    if (error.code === -32602) return "Check the field limits and try again.";
+    if (error.code === rpcErrors["invalid-params"].code)
+      return "Check the field limits and try again.";
   }
   return "The request could not be completed. Retry; if it continues, contact your app administrator.";
 }

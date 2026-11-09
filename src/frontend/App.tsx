@@ -19,6 +19,7 @@ import {
   useForm,
 } from "@forge/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { rpcErrors } from "../rpc-errors";
 import type { Commands } from "../rpc-types";
 import { failureMessage, rpc, RpcFailure } from "./client";
 
@@ -165,7 +166,8 @@ export function App({ page = "configure" }: { page?: Page }) {
         setError(failureMessage(error));
         if (
           error instanceof RpcFailure &&
-          (error.code === -32001 || error.code === -32002)
+          (error.code === rpcErrors.forbidden.code ||
+            error.code === rpcErrors["not-configured"].code)
         ) {
           setConfig(null);
           setOutput(null);

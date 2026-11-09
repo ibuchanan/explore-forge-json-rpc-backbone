@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { createDemoNarrative } from "@forge-ahead/logging/demo";
 import {
   createJSONRPCErrorResponse,
-  JSONRPCErrorCode,
   JSONRPCErrorException,
   type JSONRPCRequest,
   type JSONRPCResponse,
@@ -16,6 +15,7 @@ import {
 } from "./executor";
 import { commandNames } from "./generated/commands";
 import { logger } from "./logging";
+import { rpcErrors } from "./rpc-errors";
 
 export { commandNames } from "./generated/commands";
 
@@ -26,22 +26,18 @@ type CommandContext = { caller: Caller; store: PrefixStore };
 const server = new JSONRPCServer<CommandContext>({ errorListener: () => {} });
 server.mapErrorToJSONRPCErrorResponse = (id, error: unknown) =>
   error instanceof JSONRPCErrorException &&
-  (error.code === -32602 || error.code === -32001 || error.code === -32002)
+  (error.code === rpcErrors["invalid-params"].code ||
+    error.code === rpcErrors.forbidden.code ||
+    error.code === rpcErrors["not-configured"].code)
     ? createJSONRPCErrorResponse(id, error.code, error.message)
     : createJSONRPCErrorResponse(
         id,
-        JSONRPCErrorCode.InternalError,
-        "Internal error",
+        rpcErrors.internal.code,
+        rpcErrors.internal.message,
       );
 
 const commandErrors: Record<CommandFailure, { code: number; message: string }> =
-  {
-    forbidden: { code: -32001, message: "Forbidden" },
-    "method-not-found": { code: -32601, message: "Method not found" },
-    "invalid-params": { code: -32602, message: "Invalid params" },
-    "not-configured": { code: -32002, message: "Not configured" },
-    internal: { code: -32603, message: "Internal error" },
-  };
+  rpcErrors;
 
 for (const method of commandNames) {
   server.addMethod(method, async (params, { caller, store }) => {
@@ -57,9 +53,8 @@ for (const method of commandNames) {
 }
 export const rpcError = (
   id: string | number | null,
-  code: number,
-  message: string,
-): JSONRPCResponse => createJSONRPCErrorResponse(id, code, message);
+  error: { code: number; message: string },
+): JSONRPCResponse => createJSONRPCErrorResponse(id, error.code, error.message);
 
 /** Single-call subset: reject unsupported JSON-RPC forms before the library can execute them. */
 export async function dispatch(
@@ -99,16 +94,19 @@ export async function dispatch(
   );
   const complete = (response: JSONRPCResponse): JSONRPCResponse => {
     const code = response.error?.code;
-    const messages: Record<number, string> = {
-      [-32700]: "Reject malformed JSON before executing a command.",
-      [-32600]:
+    const rpcErrorNarratives: Record<number, string> = {
+      [rpcErrors["parse-error"].code]:
+        "Reject malformed JSON before executing a command.",
+      [rpcErrors["invalid-request"].code]:
         "Reject the unsupported request envelope before executing a command.",
-      [-32601]: "Reject an unknown RPC method.",
-      [-32602]:
+      [rpcErrors["method-not-found"].code]: "Reject an unknown RPC method.",
+      [rpcErrors["invalid-params"].code]:
         "Reject invalid command parameters without changing configuration.",
-      [-32001]: "Deny the command because this caller is not permitted.",
-      [-32002]: "Preview is unavailable until configuration has been saved.",
-      [-32603]:
+      [rpcErrors.forbidden.code]:
+        "Deny the command because this caller is not permitted.",
+      [rpcErrors["not-configured"].code]:
+        "Preview is unavailable until configuration has been saved.",
+      [rpcErrors.internal.code]:
         "The command failed internally; no exception details are recorded and a write may be uncertain.",
     };
     const successes: Record<string, string> = {
@@ -126,16 +124,22 @@ export async function dispatch(
     story.step(
       code === undefined
         ? (successes[method] ?? "RPC completed.")
-        : (messages[code] ?? "RPC rejected."),
+        : (rpcErrorNarratives[code] ?? "RPC rejected."),
     );
-    log[code === -32603 ? "error" : code === undefined ? "info" : "warn"](
+    log[
+      code === rpcErrors.internal.code
+        ? "error"
+        : code === undefined
+          ? "info"
+          : "warn"
+    ](
       {
         operation: "rpc.complete",
         disposition: "response-ready",
         outcome:
           code === undefined
             ? "succeeded"
-            : code === -32603
+            : code === rpcErrors.internal.code
               ? "failed"
               : "rejected",
         ...(code !== undefined && { rpcCode: code }),
@@ -146,7 +150,7 @@ export async function dispatch(
     return response;
   };
   if (value === undefined)
-    return complete(rpcError(null, -32700, "Parse error"));
+    return complete(rpcError(null, rpcErrors["parse-error"]));
   const id =
     candidate &&
     (typeof candidate["id"] === "string" ||
@@ -167,15 +171,15 @@ export async function dispatch(
       (key) => !["jsonrpc", "method", "params", "id"].includes(key),
     )
   ) {
-    return complete(rpcError(id, -32600, "Invalid Request"));
+    return complete(rpcError(id, rpcErrors["invalid-request"]));
   }
   if (!caller.authorized || !["api", "ui"].includes(caller.source)) {
-    return complete(rpcError(id, -32001, "Forbidden"));
+    return complete(rpcError(id, rpcErrors.forbidden));
   }
   // Library methods receive only server-constructed context, not client fields.
   const response = await server.receive(
     candidate as unknown as JSONRPCRequest,
     { caller, store },
   );
-  return complete(response ?? rpcError(id, -32603, "Internal error"));
+  return complete(response ?? rpcError(id, rpcErrors.internal));
 }
