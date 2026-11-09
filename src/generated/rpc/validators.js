@@ -1,4 +1,757 @@
 // Generated from docs/reference/openrpc.json; do not edit.
-"use strict";export const input0 = validate10;const schema11 = {"type":"object","properties":{},"required":[],"additionalProperties":false};function validate10(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){for(const key0 of Object.keys(data)){validate10.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}else {validate10.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate10.errors = vErrors;return errors === 0;}export const output0 = validate11;const schema12 = {"type":"object","required":["configured","prefix"],"additionalProperties":false,"properties":{"configured":{"type":"boolean"},"prefix":{"type":["string","null"]}}};const func0 = Object.prototype.hasOwnProperty;function validate11(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if((((data.configured === undefined) || (!(func0.call(data, "configured")))) && (missing0 = "configured")) || (((data.prefix === undefined) || (!(func0.call(data, "prefix")))) && (missing0 = "prefix"))){validate11.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!((key0 === "configured") || (key0 === "prefix"))){validate11.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.configured !== undefined && func0.call(data, "configured")){const _errs2 = errors;if(typeof data.configured !== "boolean"){validate11.errors = [{instancePath:instancePath+"/configured",schemaPath:"#/properties/configured/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"}];return false;}var valid0 = _errs2 === errors;}else {var valid0 = true;}if(valid0){if(data.prefix !== undefined && func0.call(data, "prefix")){let data1 = data.prefix;const _errs4 = errors;if((typeof data1 !== "string") && (data1 !== null)){validate11.errors = [{instancePath:instancePath+"/prefix",schemaPath:"#/properties/prefix/type",keyword:"type",params:{type: schema12.properties.prefix.type},message:"must be string,null"}];return false;}var valid0 = _errs4 === errors;}else {var valid0 = true;}}}}}else {validate11.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate11.errors = vErrors;return errors === 0;}export const input1 = validate12;const schema13 = {"type":"object","properties":{"prefix":{"type":"string","minLength":1,"maxLength":64}},"required":["prefix"],"additionalProperties":false};const func51 = (str => Array.from(str).length);function validate12(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if(((data.prefix === undefined) || (!(func0.call(data, "prefix")))) && (missing0 = "prefix")){validate12.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!(key0 === "prefix")){validate12.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.prefix !== undefined && func0.call(data, "prefix")){let data0 = data.prefix;const _errs2 = errors;if(errors === _errs2){if(typeof data0 === "string"){if(func51(data0) > 64){validate12.errors = [{instancePath:instancePath+"/prefix",schemaPath:"#/properties/prefix/maxLength",keyword:"maxLength",params:{limit: 64},message:"must NOT have more than 64 characters"}];return false;}else {if(func51(data0) < 1){validate12.errors = [{instancePath:instancePath+"/prefix",schemaPath:"#/properties/prefix/minLength",keyword:"minLength",params:{limit: 1},message:"must NOT have fewer than 1 characters"}];return false;}}}else {validate12.errors = [{instancePath:instancePath+"/prefix",schemaPath:"#/properties/prefix/type",keyword:"type",params:{type: "string"},message:"must be string"}];return false;}}}}}}else {validate12.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate12.errors = vErrors;return errors === 0;}export const output1 = validate13;const schema14 = {"type":"object","required":["configured"],"additionalProperties":false,"properties":{"configured":{"type":"boolean","enum":[true]}}};function validate13(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if(((data.configured === undefined) || (!(func0.call(data, "configured")))) && (missing0 = "configured")){validate13.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!(key0 === "configured")){validate13.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.configured !== undefined && func0.call(data, "configured")){let data0 = data.configured;if(typeof data0 !== "boolean"){validate13.errors = [{instancePath:instancePath+"/configured",schemaPath:"#/properties/configured/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"}];return false;}if(!(data0 === true)){validate13.errors = [{instancePath:instancePath+"/configured",schemaPath:"#/properties/configured/enum",keyword:"enum",params:{allowedValues: schema14.properties.configured.enum},message:"must be equal to one of the allowed values"}];return false;}}}}}else {validate13.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate13.errors = vErrors;return errors === 0;}export const input2 = validate14;const schema15 = {"type":"object","properties":{"text":{"type":"string","maxLength":2000}},"required":["text"],"additionalProperties":false};function validate14(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if(((data.text === undefined) || (!(func0.call(data, "text")))) && (missing0 = "text")){validate14.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!(key0 === "text")){validate14.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.text !== undefined && func0.call(data, "text")){let data0 = data.text;const _errs2 = errors;if(errors === _errs2){if(typeof data0 === "string"){if(func51(data0) > 2000){validate14.errors = [{instancePath:instancePath+"/text",schemaPath:"#/properties/text/maxLength",keyword:"maxLength",params:{limit: 2000},message:"must NOT have more than 2000 characters"}];return false;}}else {validate14.errors = [{instancePath:instancePath+"/text",schemaPath:"#/properties/text/type",keyword:"type",params:{type: "string"},message:"must be string"}];return false;}}}}}}else {validate14.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate14.errors = vErrors;return errors === 0;}export const output2 = validate15;const schema16 = {"type":"object","required":["output"],"additionalProperties":false,"properties":{"output":{"type":"string","maxLength":2064}}};function validate15(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if(((data.output === undefined) || (!(func0.call(data, "output")))) && (missing0 = "output")){validate15.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!(key0 === "output")){validate15.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.output !== undefined && func0.call(data, "output")){let data0 = data.output;const _errs2 = errors;if(errors === _errs2){if(typeof data0 === "string"){if(func51(data0) > 2064){validate15.errors = [{instancePath:instancePath+"/output",schemaPath:"#/properties/output/maxLength",keyword:"maxLength",params:{limit: 2064},message:"must NOT have more than 2064 characters"}];return false;}}else {validate15.errors = [{instancePath:instancePath+"/output",schemaPath:"#/properties/output/type",keyword:"type",params:{type: "string"},message:"must be string"}];return false;}}}}}}else {validate15.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate15.errors = vErrors;return errors === 0;}export const input3 = validate16;const schema17 = {"type":"object","properties":{"confirm":{"type":"boolean","enum":[true]}},"required":["confirm"],"additionalProperties":false};function validate16(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if(((data.confirm === undefined) || (!(func0.call(data, "confirm")))) && (missing0 = "confirm")){validate16.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!(key0 === "confirm")){validate16.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.confirm !== undefined && func0.call(data, "confirm")){let data0 = data.confirm;if(typeof data0 !== "boolean"){validate16.errors = [{instancePath:instancePath+"/confirm",schemaPath:"#/properties/confirm/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"}];return false;}if(!(data0 === true)){validate16.errors = [{instancePath:instancePath+"/confirm",schemaPath:"#/properties/confirm/enum",keyword:"enum",params:{allowedValues: schema17.properties.confirm.enum},message:"must be equal to one of the allowed values"}];return false;}}}}}else {validate16.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate16.errors = vErrors;return errors === 0;}export const output3 = validate17;const schema18 = {"type":"object","required":["configured"],"additionalProperties":false,"properties":{"configured":{"type":"boolean","enum":[false]}}};function validate17(data, {instancePath="", parentData, parentDataProperty, rootData=data}={}){let vErrors = null;let errors = 0;if(errors === 0){if(data && typeof data == "object" && !Array.isArray(data)){let missing0;if(((data.configured === undefined) || (!(func0.call(data, "configured")))) && (missing0 = "configured")){validate17.errors = [{instancePath,schemaPath:"#/required",keyword:"required",params:{missingProperty: missing0},message:"must have required property '"+missing0+"'"}];return false;}else {const _errs1 = errors;for(const key0 of Object.keys(data)){if(!(key0 === "configured")){validate17.errors = [{instancePath,schemaPath:"#/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key0},message:"must NOT have additional properties"}];return false;break;}}if(_errs1 === errors){if(data.configured !== undefined && func0.call(data, "configured")){let data0 = data.configured;if(typeof data0 !== "boolean"){validate17.errors = [{instancePath:instancePath+"/configured",schemaPath:"#/properties/configured/type",keyword:"type",params:{type: "boolean"},message:"must be boolean"}];return false;}if(!(data0 === false)){validate17.errors = [{instancePath:instancePath+"/configured",schemaPath:"#/properties/configured/enum",keyword:"enum",params:{allowedValues: schema18.properties.configured.enum},message:"must be equal to one of the allowed values"}];return false;}}}}}else {validate17.errors = [{instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"}];return false;}}validate17.errors = vErrors;return errors === 0;}
-export const inputValidators = { "config.get": input0, "config.set": input1, "integration.preview": input2, "config.reset": input3 };
-export const outputValidators = { "config.get": output0, "config.set": output1, "integration.preview": output2, "config.reset": output3 };
+"use strict";
+export const input0 = validate10;
+const schema11 = {
+  type: "object",
+  properties: {},
+  required: [],
+  additionalProperties: false,
+};
+function validate10(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      for (const key0 of Object.keys(data)) {
+        validate10.errors = [
+          {
+            instancePath,
+            schemaPath: "#/additionalProperties",
+            keyword: "additionalProperties",
+            params: { additionalProperty: key0 },
+            message: "must NOT have additional properties",
+          },
+        ];
+        return false;
+        break;
+      }
+    } else {
+      validate10.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate10.errors = vErrors;
+  return errors === 0;
+}
+export const output0 = validate11;
+const schema12 = {
+  type: "object",
+  required: ["configured", "prefix"],
+  additionalProperties: false,
+  properties: {
+    configured: { type: "boolean" },
+    prefix: { type: ["string", "null"] },
+  },
+};
+const func0 = Object.prototype.hasOwnProperty;
+function validate11(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        ((data.configured === undefined || !func0.call(data, "configured")) &&
+          (missing0 = "configured")) ||
+        ((data.prefix === undefined || !func0.call(data, "prefix")) &&
+          (missing0 = "prefix"))
+      ) {
+        validate11.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "configured" || key0 === "prefix")) {
+            validate11.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.configured !== undefined && func0.call(data, "configured")) {
+            const _errs2 = errors;
+            if (typeof data.configured !== "boolean") {
+              validate11.errors = [
+                {
+                  instancePath: instancePath + "/configured",
+                  schemaPath: "#/properties/configured/type",
+                  keyword: "type",
+                  params: { type: "boolean" },
+                  message: "must be boolean",
+                },
+              ];
+              return false;
+            }
+            var valid0 = _errs2 === errors;
+          } else {
+            var valid0 = true;
+          }
+          if (valid0) {
+            if (data.prefix !== undefined && func0.call(data, "prefix")) {
+              let data1 = data.prefix;
+              const _errs4 = errors;
+              if (typeof data1 !== "string" && data1 !== null) {
+                validate11.errors = [
+                  {
+                    instancePath: instancePath + "/prefix",
+                    schemaPath: "#/properties/prefix/type",
+                    keyword: "type",
+                    params: { type: schema12.properties.prefix.type },
+                    message: "must be string,null",
+                  },
+                ];
+                return false;
+              }
+              var valid0 = _errs4 === errors;
+            } else {
+              var valid0 = true;
+            }
+          }
+        }
+      }
+    } else {
+      validate11.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate11.errors = vErrors;
+  return errors === 0;
+}
+export const input1 = validate12;
+const schema13 = {
+  type: "object",
+  properties: { prefix: { type: "string", minLength: 1, maxLength: 64 } },
+  required: ["prefix"],
+  additionalProperties: false,
+};
+const func51 = (str) => Array.from(str).length;
+function validate12(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        (data.prefix === undefined || !func0.call(data, "prefix")) &&
+        (missing0 = "prefix")
+      ) {
+        validate12.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "prefix")) {
+            validate12.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.prefix !== undefined && func0.call(data, "prefix")) {
+            let data0 = data.prefix;
+            const _errs2 = errors;
+            if (errors === _errs2) {
+              if (typeof data0 === "string") {
+                if (func51(data0) > 64) {
+                  validate12.errors = [
+                    {
+                      instancePath: instancePath + "/prefix",
+                      schemaPath: "#/properties/prefix/maxLength",
+                      keyword: "maxLength",
+                      params: { limit: 64 },
+                      message: "must NOT have more than 64 characters",
+                    },
+                  ];
+                  return false;
+                } else {
+                  if (func51(data0) < 1) {
+                    validate12.errors = [
+                      {
+                        instancePath: instancePath + "/prefix",
+                        schemaPath: "#/properties/prefix/minLength",
+                        keyword: "minLength",
+                        params: { limit: 1 },
+                        message: "must NOT have fewer than 1 characters",
+                      },
+                    ];
+                    return false;
+                  }
+                }
+              } else {
+                validate12.errors = [
+                  {
+                    instancePath: instancePath + "/prefix",
+                    schemaPath: "#/properties/prefix/type",
+                    keyword: "type",
+                    params: { type: "string" },
+                    message: "must be string",
+                  },
+                ];
+                return false;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      validate12.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate12.errors = vErrors;
+  return errors === 0;
+}
+export const output1 = validate13;
+const schema14 = {
+  type: "object",
+  required: ["configured"],
+  additionalProperties: false,
+  properties: { configured: { type: "boolean", enum: [true] } },
+};
+function validate13(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        (data.configured === undefined || !func0.call(data, "configured")) &&
+        (missing0 = "configured")
+      ) {
+        validate13.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "configured")) {
+            validate13.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.configured !== undefined && func0.call(data, "configured")) {
+            let data0 = data.configured;
+            if (typeof data0 !== "boolean") {
+              validate13.errors = [
+                {
+                  instancePath: instancePath + "/configured",
+                  schemaPath: "#/properties/configured/type",
+                  keyword: "type",
+                  params: { type: "boolean" },
+                  message: "must be boolean",
+                },
+              ];
+              return false;
+            }
+            if (!(data0 === true)) {
+              validate13.errors = [
+                {
+                  instancePath: instancePath + "/configured",
+                  schemaPath: "#/properties/configured/enum",
+                  keyword: "enum",
+                  params: {
+                    allowedValues: schema14.properties.configured.enum,
+                  },
+                  message: "must be equal to one of the allowed values",
+                },
+              ];
+              return false;
+            }
+          }
+        }
+      }
+    } else {
+      validate13.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate13.errors = vErrors;
+  return errors === 0;
+}
+export const input2 = validate14;
+const schema15 = {
+  type: "object",
+  properties: { text: { type: "string", maxLength: 2000 } },
+  required: ["text"],
+  additionalProperties: false,
+};
+function validate14(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        (data.text === undefined || !func0.call(data, "text")) &&
+        (missing0 = "text")
+      ) {
+        validate14.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "text")) {
+            validate14.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.text !== undefined && func0.call(data, "text")) {
+            let data0 = data.text;
+            const _errs2 = errors;
+            if (errors === _errs2) {
+              if (typeof data0 === "string") {
+                if (func51(data0) > 2000) {
+                  validate14.errors = [
+                    {
+                      instancePath: instancePath + "/text",
+                      schemaPath: "#/properties/text/maxLength",
+                      keyword: "maxLength",
+                      params: { limit: 2000 },
+                      message: "must NOT have more than 2000 characters",
+                    },
+                  ];
+                  return false;
+                }
+              } else {
+                validate14.errors = [
+                  {
+                    instancePath: instancePath + "/text",
+                    schemaPath: "#/properties/text/type",
+                    keyword: "type",
+                    params: { type: "string" },
+                    message: "must be string",
+                  },
+                ];
+                return false;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      validate14.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate14.errors = vErrors;
+  return errors === 0;
+}
+export const output2 = validate15;
+const schema16 = {
+  type: "object",
+  required: ["output"],
+  additionalProperties: false,
+  properties: { output: { type: "string", maxLength: 2064 } },
+};
+function validate15(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        (data.output === undefined || !func0.call(data, "output")) &&
+        (missing0 = "output")
+      ) {
+        validate15.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "output")) {
+            validate15.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.output !== undefined && func0.call(data, "output")) {
+            let data0 = data.output;
+            const _errs2 = errors;
+            if (errors === _errs2) {
+              if (typeof data0 === "string") {
+                if (func51(data0) > 2064) {
+                  validate15.errors = [
+                    {
+                      instancePath: instancePath + "/output",
+                      schemaPath: "#/properties/output/maxLength",
+                      keyword: "maxLength",
+                      params: { limit: 2064 },
+                      message: "must NOT have more than 2064 characters",
+                    },
+                  ];
+                  return false;
+                }
+              } else {
+                validate15.errors = [
+                  {
+                    instancePath: instancePath + "/output",
+                    schemaPath: "#/properties/output/type",
+                    keyword: "type",
+                    params: { type: "string" },
+                    message: "must be string",
+                  },
+                ];
+                return false;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      validate15.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate15.errors = vErrors;
+  return errors === 0;
+}
+export const input3 = validate16;
+const schema17 = {
+  type: "object",
+  properties: { confirm: { type: "boolean", enum: [true] } },
+  required: ["confirm"],
+  additionalProperties: false,
+};
+function validate16(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        (data.confirm === undefined || !func0.call(data, "confirm")) &&
+        (missing0 = "confirm")
+      ) {
+        validate16.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "confirm")) {
+            validate16.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.confirm !== undefined && func0.call(data, "confirm")) {
+            let data0 = data.confirm;
+            if (typeof data0 !== "boolean") {
+              validate16.errors = [
+                {
+                  instancePath: instancePath + "/confirm",
+                  schemaPath: "#/properties/confirm/type",
+                  keyword: "type",
+                  params: { type: "boolean" },
+                  message: "must be boolean",
+                },
+              ];
+              return false;
+            }
+            if (!(data0 === true)) {
+              validate16.errors = [
+                {
+                  instancePath: instancePath + "/confirm",
+                  schemaPath: "#/properties/confirm/enum",
+                  keyword: "enum",
+                  params: { allowedValues: schema17.properties.confirm.enum },
+                  message: "must be equal to one of the allowed values",
+                },
+              ];
+              return false;
+            }
+          }
+        }
+      }
+    } else {
+      validate16.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate16.errors = vErrors;
+  return errors === 0;
+}
+export const output3 = validate17;
+const schema18 = {
+  type: "object",
+  required: ["configured"],
+  additionalProperties: false,
+  properties: { configured: { type: "boolean", enum: [false] } },
+};
+function validate17(
+  data,
+  { instancePath = "", parentData, parentDataProperty, rootData = data } = {},
+) {
+  let vErrors = null;
+  let errors = 0;
+  if (errors === 0) {
+    if (data && typeof data == "object" && !Array.isArray(data)) {
+      let missing0;
+      if (
+        (data.configured === undefined || !func0.call(data, "configured")) &&
+        (missing0 = "configured")
+      ) {
+        validate17.errors = [
+          {
+            instancePath,
+            schemaPath: "#/required",
+            keyword: "required",
+            params: { missingProperty: missing0 },
+            message: "must have required property '" + missing0 + "'",
+          },
+        ];
+        return false;
+      } else {
+        const _errs1 = errors;
+        for (const key0 of Object.keys(data)) {
+          if (!(key0 === "configured")) {
+            validate17.errors = [
+              {
+                instancePath,
+                schemaPath: "#/additionalProperties",
+                keyword: "additionalProperties",
+                params: { additionalProperty: key0 },
+                message: "must NOT have additional properties",
+              },
+            ];
+            return false;
+            break;
+          }
+        }
+        if (_errs1 === errors) {
+          if (data.configured !== undefined && func0.call(data, "configured")) {
+            let data0 = data.configured;
+            if (typeof data0 !== "boolean") {
+              validate17.errors = [
+                {
+                  instancePath: instancePath + "/configured",
+                  schemaPath: "#/properties/configured/type",
+                  keyword: "type",
+                  params: { type: "boolean" },
+                  message: "must be boolean",
+                },
+              ];
+              return false;
+            }
+            if (!(data0 === false)) {
+              validate17.errors = [
+                {
+                  instancePath: instancePath + "/configured",
+                  schemaPath: "#/properties/configured/enum",
+                  keyword: "enum",
+                  params: {
+                    allowedValues: schema18.properties.configured.enum,
+                  },
+                  message: "must be equal to one of the allowed values",
+                },
+              ];
+              return false;
+            }
+          }
+        }
+      }
+    } else {
+      validate17.errors = [
+        {
+          instancePath,
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ];
+      return false;
+    }
+  }
+  validate17.errors = vErrors;
+  return errors === 0;
+}
+export const inputValidators = {
+  "config.get": input0,
+  "config.set": input1,
+  "integration.preview": input2,
+  "config.reset": input3,
+};
+export const outputValidators = {
+  "config.get": output0,
+  "config.set": output1,
+  "integration.preview": output2,
+  "config.reset": output3,
+};
