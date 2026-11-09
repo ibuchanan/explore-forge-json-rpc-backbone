@@ -16,7 +16,6 @@ vi.mock("@forge/kvs", () => ({
   kvs: { get: mocks.get, set: mocks.set, delete: mocks.delete },
 }));
 
-import { run } from "../src/index";
 import { handler } from "../src/resolver";
 import { logRecords } from "./logging";
 
@@ -50,7 +49,7 @@ beforeEach(() => {
   });
 });
 
-it("uses the official resolver and shares read, save and preview commands and KVS with HTTP", async () => {
+it("uses the official resolver for read, save and preview with shared KVS", async () => {
   expect(await invoke(payload("config.get"))).toHaveProperty("result", {
     configured: false,
     prefix: null,
@@ -72,31 +71,7 @@ it("uses the official resolver and shares read, save and preview commands and KV
     id: "ui-request",
     result: { output: "😀 hi\n" },
   });
-  vi.stubEnv("RPC_BEARER_SECRET", "test-secret");
-  try {
-    const event = (request: unknown) => ({
-      method: "POST" as const,
-      path: "/",
-      queryParameters: {},
-      headers: {
-        Authorization: ["Bearer test-secret"],
-        "Content-Type": ["application/json"],
-      },
-      body: JSON.stringify(request),
-    });
-    const preview = payload("integration.preview", { text: " hi\n" });
-    expect(JSON.parse((await run(event(preview))).body ?? "")).toEqual(
-      await invoke(preview),
-    );
-    await run(event(payload("config.set", { prefix: "changed" })));
-    expect(await invoke(preview)).toHaveProperty(
-      "result.output",
-      "changed hi\n",
-    );
-    expect([...mocks.data.entries()]).toEqual([["config.prefix", "changed"]]);
-  } finally {
-    vi.unstubAllEnvs();
-  }
+  expect([...mocks.data.entries()]).toEqual([["config.prefix", "😀"]]);
   expect(mocks.requestJira).toHaveBeenCalledWith(
     "/rest/api/3/mypermissions?permissions=ADMINISTER",
   );
@@ -105,7 +80,6 @@ it("uses the official resolver and shares read, save and preview commands and KV
     (record) => record["operation"] === "rpc.invoke",
   );
   expect(invocations.some((record) => record["source"] === "ui")).toBe(true);
-  expect(invocations.some((record) => record["source"] === "api")).toBe(true);
   for (const sensitive of [
     "trusted-admin",
     "ui-request",

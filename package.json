@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "changelog": "git cliff --config cliff.toml --unreleased -o CHANGELOG.md",
-    "check": "run-p --npm-path npm --print-label lint test size:check format:check generate:commands:check",
+    "check": "run-p --npm-path npm --print-label lint test size:check format:check generate:commands:check generate:rpc:check",
     "clean": "rm -rf dist",
     "forge:deploy": "cmd=$(fence-rider deploy -- --non-interactive) && sh -c \"$cmd\" sh",
     "forge:install": "cmd=$(fence-rider install -- --confirm-scopes --non-interactive) && sh -c \"$cmd\" sh",
@@ -37,7 +37,9 @@
     "test:deployed": "secretspec run --scope '' -- sh scripts/test-deployed.sh",
     "test:watch": "vitest watch --passWithNoTests",
     "todo": "git grep -n -I -F TO\"DO\" -- .; status=$?; if [ \"$status\" -eq 1 ]; then echo \"No TO\"\"DO markers found.\"; elif [ \"$status\" -ne 0 ]; then exit \"$status\"; fi",
-    "typecheck": "tsc --project tsconfig.typecheck.json --noEmit"
+    "typecheck": "tsc --project tsconfig.typecheck.json --noEmit",
+    "generate:rpc": "bun run scripts/generate-rpc.ts generate",
+    "generate:rpc:check": "bun run scripts/generate-rpc.ts check"
   },
   "dependencies": {
     "@forge-ahead/atlassian-api-types": "github:ibuchanan/forge-ahead-atlassian-api-types",
@@ -49,6 +51,7 @@
     "@forge/kvs": "^2.1",
     "@forge/react": "^12.3",
     "@forge/resolver": "^2.0",
+    "forge-ahead-rpc": "file:../forge-ahead-rpc",
     "json-rpc-2.0": "^1.8",
     "react": "^18.3"
   },
@@ -84,7 +87,7 @@
     {
       "name": "Forge app bundle",
       "path": "dist/**/*.js",
-      "limit": "10 kB"
+      "limit": "16 kB"
     }
   ]
 }

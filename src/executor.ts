@@ -32,7 +32,7 @@ const object = (
 
 // Accept unknown input at the runtime boundary; the generated map checks every
 // command's implementation and successful output, without supplying app policy.
-const handlers = {
+export const handlers = {
   "config.set": async (params: unknown, { store }) => {
     if (!object(params, ["prefix"]) || typeof params["prefix"] !== "string")
       return err("invalid-params");

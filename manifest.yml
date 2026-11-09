@@ -41,6 +41,10 @@ permissions:
   scopes:
     - storage:app
     - read:jira-work
+  external:
+    fetch:
+      backend:
+        - https://*.atlassian.net
 resources:
   - key: config-ui
     path: src/frontend/index.tsx

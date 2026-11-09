@@ -51,6 +51,11 @@
   "methods": [
     {
       "name": "config.get",
+      "x-forge-ahead": {
+        "web": true,
+        "execution": "asApp",
+        "audit": "standard"
+      },
       "summary": "Read the saved non-secret prefix or the unconfigured state.",
       "paramStructure": "by-name",
       "params": [],
@@ -150,6 +155,11 @@
     },
     {
       "name": "integration.preview",
+      "x-forge-ahead": {
+        "web": true,
+        "execution": "asApp",
+        "audit": "standard"
+      },
       "summary": "Preview local output using the saved prefix.",
       "description": "Accepts exactly one text parameter containing at most 2,000 Unicode code points, including empty text. Returns the saved prefix concatenated with text without trimming or normalization. Reads the current installation-scoped prefix on every call; no implicit default or client-supplied configuration is used. Does not persist text or output or call an external API. Invalid params are rejected before checking configuration. Before setup, returns Not configured (-32002).",
       "paramStructure": "by-name",

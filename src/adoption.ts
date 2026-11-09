@@ -1,0 +1,113 @@
+import { err, ok, type Result } from "@forge-ahead/errors";
+import { createDispatcher, createWebDispatcher } from "forge-ahead-rpc";
+import {
+  createJiraAdminAuthenticator,
+  createWebtrigger,
+} from "forge-ahead-rpc/webtrigger";
+import { type Caller, handlers, type PrefixStore } from "./executor";
+import { catalog } from "./generated/rpc/catalog";
+import type { HandlerMap } from "./generated/rpc/contract";
+import {
+  inputValidators,
+  outputValidators,
+} from "./generated/rpc/validators.js";
+import { webPolicy } from "./generated/rpc/web-policy";
+
+type Context = { caller: Caller; store: PrefixStore };
+type Failure =
+  | "forbidden"
+  | "method-not-found"
+  | "invalid-params"
+  | "command-failed"
+  | "internal-error";
+
+// The app owns normalization, authorization and storage. This adapter does not
+// turn an application failure into a transport policy or retry instruction.
+const adapt =
+  <Params, Output>(
+    run: (
+      params: Params,
+      context: Context,
+    ) => Promise<Result<Output, import("./executor").CommandFailure>>,
+  ): ((params: Params, context: Context) => Promise<Result<Output, Failure>>) =>
+  async (params, context) => {
+    if (
+      !context.caller.authorized ||
+      !["api", "ui"].includes(context.caller.source)
+    )
+      return err("forbidden");
+    try {
+      const result = await run(params, context);
+      return result.match(
+        (value) => ok(value),
+        (failure) =>
+          err(
+            failure === "internal"
+              ? "internal-error"
+              : failure === "not-configured"
+                ? "command-failed"
+                : failure,
+          ),
+      );
+    } catch {
+      return err("internal-error");
+    }
+  };
+
+const appHandlers = {
+  "config.get": adapt(handlers["config.get"]),
+  "config.set": adapt(handlers["config.set"]),
+  "integration.preview": adapt(handlers["integration.preview"]),
+  "config.reset": adapt(handlers["config.reset"]),
+} satisfies HandlerMap<Context, Failure>;
+
+export function createAdoptedRpc({ store }: { store: PrefixStore }) {
+  const dispatch = createDispatcher({
+    handlers: appHandlers,
+    inputValidators,
+    outputValidators,
+  });
+  const web = createWebDispatcher({
+    handlers: appHandlers,
+    inputValidators,
+    outputValidators,
+    webPolicy,
+    catalog,
+    // Exposure is none until a reviewed per-installation selection is supplied.
+  });
+  return { dispatch, web, store };
+}
+
+/** Only a Forge-provided installation ARI may select the configured Jira site. */
+export function createAdoptedWebtrigger(options: {
+  store: PrefixStore;
+  requestJira: (
+    url: string,
+    authorization: string,
+  ) => Promise<{ status: number; body: unknown }>;
+  installation?: { id: string; jiraSiteUrl: string } | undefined;
+}) {
+  return createWebtrigger({
+    handlers: appHandlers,
+    inputValidators,
+    outputValidators,
+    webPolicy,
+    catalog,
+    installation: (context: { installContext?: string }) =>
+      context.installContext &&
+      context.installContext === options.installation?.id
+        ? options.installation
+        : undefined,
+    authenticate: createJiraAdminAuthenticator(options.requestJira),
+    context: (_installation, _principal) => ({
+      caller: { source: "api" as const, authorized: true },
+      store: options.store,
+    }),
+    selection: () => ({
+      "config.get": "asApp",
+      "integration.preview": "asApp",
+    }),
+    authorize: (_method, mode, context) =>
+      mode === "asApp" && context.caller.authorized,
+  });
+}
