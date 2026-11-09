@@ -1,5 +1,9 @@
 # Local product-event outcome translation evidence
 
+> **Historical record.** This describes the hand-written dispatcher and the
+> retired bearer-secret web trigger, which `forge-ahead-rpc` has replaced. See the
+> [main spec](spec.md) for the current design.
+
 <!-- cspell:words prelint -->
 
 Status: local contract proof, 2026-10-25. Tested base:

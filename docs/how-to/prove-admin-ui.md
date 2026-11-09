@@ -7,8 +7,7 @@ saved configuration,
 and preview output.
 You will also trace each action from UI Kit
 through the resolver into the shared commands.
-For the external transport,
-use [How to prove it works via JSON-RPC](prove-json-rpc.md).
+This guide does not cover the web trigger transport.
 
 This app is essentially a "Hello, world!" app.
 The **prefix** is arbitrary demo text placed before other text.
@@ -48,18 +47,8 @@ The **preview text** and **Run preview** operation are the "... world" part.
   or start a tunnel as part of verification.
   For unchanged runtime credentials,
   do not upload them again.
-  The UI uses your Jira identity,
-  not the HTTP bearer credential.
+  The UI uses your Jira identity.
 
-**If you plan to run the full deployed HTTP verifier on this installation:**
-it requires an installation with no saved prefix and leaves `poc-😀` saved.
-You can start with either guide.
-If you saved through the UI first, use the
-[confirmed reset procedure](#reset-demo-configuration-for-another-verification-run)
-on the approved test installation before running the
-[HTTP suite](prove-json-rpc.md#run-the-full-deployed-verifier).
-Capture empty/loading states before the suite saves configuration,
-then compare its saved value in the UI.
 Do not uninstall or edit KVS manually just to reset the demo.
 
 ## 1. Check the three entry points
@@ -182,10 +171,11 @@ Configure form -> App.save -> rpc("config.set", { prefix })
    The browser cannot supply its own trusted caller context. Merely hiding the
    admin page is not the authorization boundary.
 
-5. [`commands.ts`](../../src/commands.ts)
-   validates the JSON-RPC envelope and caller,
-   then selects `config.set`.
-   That command trims and validates the prefix,
+5. [`adoption.ts`](../../src/adoption.ts)
+   passes the request to the package dispatcher,
+   which validates the JSON-RPC envelope and parameters,
+   then selects `config.set` in [`executor.ts`](../../src/executor.ts).
+   That command trims the prefix,
    calls `store.set(prefix)`,
    and returns `{ configured: true }`.
    [`store.ts`](../../src/store.ts) maps that write to
@@ -219,9 +209,9 @@ use the same installation in the JSON-RPC comparison below.
 
 The preview form calls `rpc("integration.preview", { text })`
 through the same client, resolver, and dispatcher used for Save.
-In [`commands.ts`](../../src/commands.ts),
-the command validates `text`,
-reads the current prefix,
+In [`executor.ts`](../../src/executor.ts),
+the package dispatcher has already validated `text`,
+and the command reads the current prefix,
 rejects missing configuration,
 and returns:
 
@@ -242,8 +232,8 @@ Use approved test inputs and safe failure injection only.
 ### Validation checklist
 
 - A blank/whitespace-only prefix and 65 emoji must fail field validation.
-  A trimmed 64-emoji prefix is valid;
-  length counts Unicode code points.
+  A 64-emoji prefix is valid; a 64-emoji prefix with surrounding whitespace is
+  not, because length counts the raw Unicode code points.
 - A preview of 2,001 emoji must fail;
   2,000 emoji and empty text are valid.
   Invalid form submissions must not invoke their command.
@@ -271,7 +261,6 @@ an `rpc.complete` outcome, and a two-step `rpc-lifecycle` demo narrative.
 Group records by the generated `invocationId`; client IDs, account IDs,
 prefixes, preview values, and exception details are omitted.
 A save/reset completion is not the separate read-back verification.
-See [log streams and levels](prove-json-rpc.md#follow-the-verification-narrative).
 
 The corresponding local coverage is in [`ui.test.tsx`](../../test/ui.test.tsx),
 [`resolver.test.ts`](../../test/resolver.test.ts),
@@ -300,9 +289,8 @@ if the value must be retained, use read/preview checks instead.
 4. If deletion or verification cannot be confirmed, use **Retry** to read current
    configuration before attempting another reset. An error or lost reply does
    not mean the delete rolled back. Do not infer success from the empty field.
-5. Run the full HTTP verifier before saving another prefix, or save a new prefix
-   to prove reconfiguration works. Keep other operators from writing concurrently.
-   Finish cross-transport comparisons before discarding their test value.
+5. Save a new prefix to prove reconfiguration works. Keep other operators from
+   writing concurrently. Finish any comparisons before discarding the test value.
 
 Reset follows the same Bridge and as-user permission check as Save, then calls
 `rpc("config.reset", { confirm: true })`. The shared command requires the trusted
@@ -310,16 +298,10 @@ UI caller source and exact confirmation before calling
 `store.reset()`, which performs `kvs.delete("config.prefix")`.
 It is idempotent if the key is already absent.
 The UI then calls `config.get` to verify deletion.
-The HTTP bearer secret, unrelated storage, app identity, and installation remain
-unchanged. Even an authenticated HTTP caller cannot reset (`-32001 Forbidden`);
-the verifier never resets configuration automatically.
+Unrelated storage, app identity, and installation remain unchanged. Reset is not
+exposed through the web trigger, which returns `-32601 Method not found`.
 
-## 5. Compare transports and record the result
-
-On the **same app, environment, and installation**,
-use the [JSON-RPC read and preview requests](prove-json-rpc.md#inspect-individual-json-rpc-requests)
-with the current saved prefix and exactly the same sample text.
-Expect matching saved values and byte-for-byte equal output.
+## 5. Record the result
 
 Record
 the source revision/Forge version,
@@ -334,7 +316,7 @@ Record failures and discrepancies,
 not just the final successful attempt.
 Use the [verification record](../../specs/deployed-poc-verification.md);
 leave unavailable checks **unverified**.
-A UI pass alone does not prove HTTP authentication,
+A UI pass alone does not prove web trigger authentication,
 installation isolation,
 or a real integration works.
 

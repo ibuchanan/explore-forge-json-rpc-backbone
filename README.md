@@ -18,13 +18,15 @@ package (`package.json` marks it private).
 Get started) and one authenticated v2 web trigger share `config.get`,
 `config.set`, and `integration.preview` through the same
 JSON-RPC dispatcher and installation-scoped KVS store. The UI resolver checks
-Jira `ADMINISTER` permission on every call; HTTP uses a separately provisioned
-bearer secret. Preview only concatenates the saved prefix and supplied text.
+Jira `ADMINISTER` permission on every call; the web trigger verifies the caller
+as a Jira administrator through HTTP Basic credentials and exposes only
+`config.get` and `integration.preview`. Preview only concatenates the saved
+prefix and supplied text.
 Configure also offers a confirmed, admin-only `config.reset` command to remove
-that prefix for repeat verification; HTTP callers cannot reset configuration.
-Local tests pass. An operator-reported deployed HTTP run passed all 30 checks
-in approximately 10.48 seconds; installed UI, isolation, and backend-log
-acceptance remain unverified in the [evidence record](specs/deployed-poc-verification.md).
+that prefix for repeat verification; The web trigger cannot reset or save configuration.
+Local tests pass. The earlier operator-reported deployed run in the
+[evidence record](specs/deployed-poc-verification.md) used the retired bearer
+credential, so the current web trigger and installed UI remain unverified.
 This is a proof of concept, not production-ready integration software.
 
 ## Try the repository locally
@@ -37,7 +39,7 @@ npm ci
 npm run test
 ```
 
-Vitest covers the command contract, HTTP boundary, resolver authorization,
+Vitest covers the command contract, web trigger boundary, resolver authorization,
 shared storage, and UI behavior without a browser or deployed app.
 `npm run check` is the broader pre-push gate, including Forge lint.
 Deploying or installing is a separate, opt-in Forge operation; see
@@ -51,13 +53,10 @@ The [main spec](specs/spec.md) plans the next command-layer and adapter proofs;
 it does not replace separate local, deployed HTTP, and installed-UI evidence.
 [Prove it from the Admin UI](docs/how-to/prove-admin-ui.md) covers save, reload,
 preview, and error checks, with a UI-to-resolver-to-command execution trace.
-[Prove it via JSON-RPC](docs/how-to/prove-json-rpc.md) covers HTTP requests and
-the deployed verifier, with the corresponding web-trigger execution trace.
-`npm run forge:webtrigger:upsert` saves or reuses the URL through SecretSpec;
-`npm run test:deployed` resolves its settings and runs the upsert automatically.
-See [verification configuration](DEVELOPMENT.md#configure-deployed-verification)
-first.
-Both guides require separate approval for deployment, installation, and test writes.
+Web trigger configuration and the read-only `npm run test:deployed` live check
+are described in
+[development guidance](DEVELOPMENT.md#configure-the-web-trigger).
+Deployment, installation, and test writes require separate approval.
 The `read:jira-work` scope requires consent on existing installations that do
 not yet grant it. Do not infer live acceptance from local mocks.
 

@@ -1,5 +1,5 @@
 import { kvs } from "@forge/kvs";
-import type { PrefixStore } from "./commands";
+import type { PrefixStore } from "./executor";
 
 export const store: PrefixStore = {
   get: () => kvs.get<string>("config.prefix"),

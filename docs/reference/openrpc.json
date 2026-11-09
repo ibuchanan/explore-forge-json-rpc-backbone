@@ -7,19 +7,21 @@
   },
   "x-security": {
     "type": "http",
-    "scheme": "bearer",
-    "description": "Supply one Authorization: Bearer <token> header. The token is an encrypted per-environment Forge runtime variable (RPC_BEARER_SECRET), issued only to approved test operators. The public URL alone grants no access."
+    "scheme": "basic",
+    "description": "Supply one Authorization: Basic header with a Jira user's email and API token. The web trigger verifies the identity and Jira ADMINISTER permission on every request, for the configured installation only. The public URL alone grants no access."
   },
   "x-http": {
     "method": "POST",
     "contentType": "application/json",
-    "maxBodyBytes": 16384,
+    "maxBodyBytes": 65536,
     "nonRpcErrors": {
+      "400": "Bad Request for malformed headers, query parameters or credentials inside params",
+      "401": "Unauthorized when credentials are missing or invalid",
+      "403": "Forbidden when the verified user is not a Jira administrator",
       "405": "Method Not Allowed",
-      "415": "Unsupported Media Type",
       "413": "Payload Too Large",
-      "401": "Unauthorized",
-      "503": "Service Unavailable when the bearer secret is not configured"
+      "415": "Unsupported Media Type",
+      "503": "Service Unavailable when the installation binding or Jira verification is unavailable"
     }
   },
   "x-protocolErrors": [
@@ -29,7 +31,7 @@
     },
     {
       "code": -32600,
-      "message": "Invalid Request"
+      "message": "Invalid request"
     },
     {
       "code": -32601,
@@ -98,7 +100,7 @@
     {
       "name": "config.set",
       "summary": "Trim and persist a non-secret prefix in installation-scoped Forge KVS.",
-      "description": "The trimmed value must contain 1 to 64 Unicode code points. Only the prefix is stored. Extra parameters are rejected.",
+      "description": "The prefix must contain 1 to 64 Unicode code points as sent, including any surrounding whitespace, and at least one non-whitespace character. The trimmed value is stored. Extra parameters are rejected.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -109,7 +111,7 @@
             "minLength": 1,
             "maxLength": 64
           },
-          "description": "Validated after trimming; length counts Unicode code points."
+          "description": "Length counts Unicode code points before trimming; the trimmed value must not be empty."
         }
       ],
       "result": {
@@ -221,7 +223,7 @@
     {
       "name": "config.reset",
       "summary": "Clear the saved prefix in installation-scoped Forge KVS (admin only).",
-      "description": "Requires a trusted UI caller with Jira ADMINISTER permission and exactly confirm: true. Authenticated HTTP callers are forbidden (-32001). Deletes only config.prefix; does not alter app identity, bearer credentials or unrelated storage. Idempotent if already unset. The UI performs a separate config.get read-back before showing success.",
+      "description": "Requires a trusted UI caller with Jira ADMINISTER permission and exactly confirm: true. Authenticated HTTP callers are forbidden (-32001). Deletes only config.prefix; does not alter app identity, installation settings or unrelated storage. Idempotent if already unset. The UI performs a separate config.get read-back before showing success.",
       "paramStructure": "by-name",
       "params": [
         {

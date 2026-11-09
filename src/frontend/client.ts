@@ -1,7 +1,11 @@
 import { makeInvoke } from "@forge/bridge";
-import type { Commands, TypedCaller } from "../generated/commands";
 import { rpcErrors } from "../rpc-errors";
-import type { RpcDefinitions, RpcRequest } from "../rpc-types";
+import type {
+  Commands,
+  RpcDefinitions,
+  RpcRequest,
+  TypedCaller,
+} from "../rpc-types";
 
 const invoke = makeInvoke<RpcDefinitions>();
 let sequence = 0;

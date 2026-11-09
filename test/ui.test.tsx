@@ -1,6 +1,6 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { dispatch } from "../src/commands";
+import { dispatch } from "./dispatch";
 
 const bridge = vi.hoisted(() => ({ invoke: vi.fn(), navigate: vi.fn() }));
 vi.mock("@forge/bridge", () => ({
@@ -399,7 +399,7 @@ it("matches Unicode command boundaries without UTF-16 maxLength constraints", as
     expect(nodes("ErrorMessage")).toHaveLength(1);
     expect(prefix).toBeUndefined();
   }
-  await change("Textfield", ` ${"😀".repeat(64)} `);
+  await change("Textfield", "😀".repeat(64));
   await submit(0);
   expect(prefix).toBe("😀".repeat(64));
   expect(nodes("Textfield")[0]?.props["maxLength"]).toBeUndefined();
@@ -411,6 +411,17 @@ it("matches Unicode command boundaries without UTF-16 maxLength constraints", as
   await change("TextArea", "😀".repeat(2000));
   await submit(1);
   expect(nodes("CodeBlock")[0]?.props["text"]).toBe("😀".repeat(2064));
+});
+
+it("applies the 64 code point limit to the prefix as sent, before trimming", async () => {
+  await mount();
+  await change("Textfield", ` ${"😀".repeat(64)} `);
+  await submit(0);
+  expect(nodes("ErrorMessage")).toHaveLength(1);
+  expect(prefix).toBeUndefined();
+  await change("Textfield", ` ${"😀".repeat(62)} `);
+  await submit(0);
+  expect(prefix).toBe("😀".repeat(62));
 });
 
 it("shows initial loading and blocks duplicate saves and overlapping previews", async () => {

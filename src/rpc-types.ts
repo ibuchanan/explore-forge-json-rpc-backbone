@@ -1,8 +1,6 @@
-import type { JSONRPCResponse } from "json-rpc-2.0";
+import type { Commands } from "./generated/rpc/contract";
 
-import type { Commands } from "./generated/commands";
-
-export type { Commands } from "./generated/commands";
+export type { Caller as TypedCaller, Commands } from "./generated/rpc/contract";
 
 export type RpcRequest = {
   [M in keyof Commands]: {
@@ -13,4 +11,11 @@ export type RpcRequest = {
   };
 }[keyof Commands];
 
-export type RpcDefinitions = { rpc: (payload: RpcRequest) => JSONRPCResponse };
+export type RpcResponse = {
+  jsonrpc: "2.0";
+  id: string | number | null;
+  result?: unknown;
+  error?: { code: number; message: string };
+};
+
+export type RpcDefinitions = { rpc: (payload: RpcRequest) => RpcResponse };

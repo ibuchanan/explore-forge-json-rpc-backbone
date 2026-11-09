@@ -1,8 +1,5 @@
-import { err, ok, type Result } from "@forge-ahead/errors";
-import type { CommandName, Commands, HandlerMap } from "./generated/commands";
-import { validOutput } from "./generated/commands.validators.js";
-
-export type { Commands } from "./generated/commands";
+import { err, ok } from "@forge-ahead/errors";
+import type { HandlerMap } from "./generated/rpc/contract";
 
 export interface PrefixStore {
   get(): Promise<string | undefined>;
@@ -11,87 +8,33 @@ export interface PrefixStore {
 }
 
 export type Caller = { source: "api" | "ui"; authorized: boolean };
-export type Command = CommandName;
-export type CommandFailure =
-  | "forbidden"
-  | "method-not-found"
-  | "invalid-params"
-  | "not-configured"
-  | "internal";
+export type CommandFailure = "forbidden" | "invalid-params" | "not-configured";
 
-type Context = { caller: Caller; store: PrefixStore };
-const object = (
-  params: unknown,
-  keys: string[],
-): params is Record<string, unknown> =>
-  params !== null &&
-  typeof params === "object" &&
-  !Array.isArray(params) &&
-  Object.keys(params).length === keys.length &&
-  keys.every((key) => Object.hasOwn(params, key));
+export type Context = { caller: Caller; store: PrefixStore };
 
-// Accept unknown input at the runtime boundary; the generated map checks every
-// command's implementation and successful output, without supplying app policy.
+// The package dispatcher validates envelopes, parameter shapes and result shapes
+// from the generated contract. These handlers own only app policy: trimming,
+// caller source and storage.
 export const handlers = {
-  "config.set": async (params: unknown, { store }) => {
-    if (!object(params, ["prefix"]) || typeof params["prefix"] !== "string")
-      return err("invalid-params");
-    const prefix = params["prefix"].trim();
-    if (!prefix || [...prefix].length > 64) return err("invalid-params");
-    await store.set(prefix);
+  "config.set": async ({ prefix }, { store }) => {
+    const trimmed = prefix.trim();
+    if (!trimmed) return err("invalid-params");
+    await store.set(trimmed);
     return ok({ configured: true });
   },
-  "config.reset": async (params: unknown, { caller, store }) => {
-    if (!object(params, ["confirm"]) || params["confirm"] !== true)
-      return err("invalid-params");
+  "config.reset": async (_params, { caller, store }) => {
     if (caller.source !== "ui") return err("forbidden");
     await store.reset();
     return ok({ configured: false });
   },
-  "config.get": async (params: unknown, { store }) => {
-    if (!object(params, [])) return err("invalid-params");
+  "config.get": async (_params, { store }) => {
     const prefix = await store.get();
     return ok({ configured: prefix !== undefined, prefix: prefix ?? null });
   },
-  "integration.preview": async (params: unknown, { store }) => {
-    if (!object(params, ["text"]) || typeof params["text"] !== "string")
-      return err("invalid-params");
-    const text = params["text"];
-    if ([...text].length > 2000) return err("invalid-params");
+  "integration.preview": async ({ text }, { store }) => {
     const prefix = await store.get();
     return prefix === undefined
       ? err("not-configured")
       : ok({ output: prefix + text });
   },
 } satisfies HandlerMap<Context, CommandFailure>;
-
-type Handlers = {
-  [M in Command]: (
-    params: unknown,
-    context: Context,
-  ) => ReturnType<HandlerMap<Context, CommandFailure>[M]>;
-};
-
-export function createExecutor(handlers: Handlers) {
-  return async (
-    method: Command,
-    params: unknown,
-    caller: Caller,
-    store: PrefixStore,
-  ): Promise<Result<Commands[Command]["result"], CommandFailure>> => {
-    if (!caller.authorized || !["api", "ui"].includes(caller.source))
-      return err("forbidden");
-    if (!Object.hasOwn(handlers, method)) return err("method-not-found");
-    try {
-      const result = await handlers[method](params, { caller, store });
-      return result.match(
-        (value) => (validOutput(method, value) ? result : err("internal")),
-        () => result,
-      );
-    } catch {
-      return err("internal");
-    }
-  };
-}
-
-export const execute = createExecutor(handlers);

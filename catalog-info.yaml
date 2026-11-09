@@ -2,7 +2,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: "explore-forge-json-rpc-backbone"
-  title: "explore-forge-json-rpc-backbone"
+  title: "Explore a Forge JSON-RPC Backbone"
   description: ""
   annotations:
     # Shared metadata for other modules lives here under forge-ranch/*.
@@ -22,4 +22,4 @@ metadata:
 spec:
   type: "forge-app"
   lifecycle: experimental
-  owner: "user:default/your-staff-id"
+  owner: "user:default/ibuchanan"

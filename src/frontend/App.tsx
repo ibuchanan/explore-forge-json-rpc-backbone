@@ -24,7 +24,7 @@ import type { Commands } from "../rpc-types";
 import { failureMessage, rpc, RpcFailure } from "./client";
 
 const prefixHelp =
-  "Surrounding whitespace is trimmed. Enter 1–64 Unicode code points after trimming. This is not a secret.";
+  "Enter 1–64 Unicode code points, including any surrounding whitespace, which is trimmed before saving. This is not a secret.";
 const textHelp =
   "Empty text is allowed; maximum 2,000 Unicode code points. Uses the saved prefix, not unsaved edits.";
 
@@ -64,7 +64,7 @@ function PrefixForm({
         <Textfield
           {...register("prefix", {
             validate: (value) =>
-              (value.trim().length > 0 && [...value.trim()].length <= 64) ||
+              (value.trim().length > 0 && [...value].length <= 64) ||
               prefixHelp,
           })}
           isDisabled={disabled}
@@ -338,8 +338,8 @@ export function App({ page = "configure" }: { page?: Page }) {
         <SectionMessage appearance="success" title="Configuration reset">
           <Text>
             The saved demo prefix was removed and the unconfigured state was
-            verified. Preview is disabled until you save a new prefix. The HTTP
-            bearer secret and app installation have not changed.
+            verified. Preview is disabled until you save a new prefix. The app
+            installation has not changed.
           </Text>
         </SectionMessage>
       )}
@@ -467,8 +467,8 @@ export function App({ page = "configure" }: { page?: Page }) {
             <Text>
               Remove this installation’s saved prefix to repeat the unconfigured
               verification flow. This cannot be undone; only reset a test
-              setting you are authorized to discard. It does not delete the HTTP
-              bearer secret or uninstall the app.
+              setting you are authorized to discard. It does not uninstall the
+              app.
             </Text>
             {confirmReset ? (
               <>

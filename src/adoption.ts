@@ -1,10 +1,15 @@
-import { err, ok, type Result } from "@forge-ahead/errors";
+import { err, type Result } from "@forge-ahead/errors";
 import { createDispatcher, createWebDispatcher } from "forge-ahead-rpc";
 import {
   createJiraAdminAuthenticator,
   createWebtrigger,
 } from "forge-ahead-rpc/webtrigger";
-import { type Caller, handlers, type PrefixStore } from "./executor";
+import {
+  type CommandFailure,
+  type Context,
+  handlers,
+  type PrefixStore,
+} from "./executor";
 import { catalog } from "./generated/rpc/catalog";
 import type { HandlerMap } from "./generated/rpc/contract";
 import {
@@ -12,17 +17,10 @@ import {
   outputValidators,
 } from "./generated/rpc/validators.js";
 import { webPolicy } from "./generated/rpc/web-policy";
+import { rpcErrors } from "./rpc-errors";
 
-type Context = { caller: Caller; store: PrefixStore };
-type Failure =
-  | "forbidden"
-  | "method-not-found"
-  | "invalid-params"
-  | "not-configured"
-  | "internal-error";
-const errorMap = {
-  "not-configured": { code: -32002, message: "Not configured" },
-} as const;
+type Failure = CommandFailure | "internal-error";
+const errorMap = { "not-configured": rpcErrors["not-configured"] } as const;
 
 // The app owns normalization, authorization and storage. This adapter does not
 // turn an application failure into a transport policy or retry instruction.
@@ -31,7 +29,7 @@ const adapt =
     run: (
       params: Params,
       context: Context,
-    ) => Promise<Result<Output, import("./executor").CommandFailure>>,
+    ) => Promise<Result<Output, CommandFailure>>,
   ): ((params: Params, context: Context) => Promise<Result<Output, Failure>>) =>
   async (params, context) => {
     if (
@@ -40,11 +38,7 @@ const adapt =
     )
       return err("forbidden");
     try {
-      const result = await run(params, context);
-      return result.match(
-        (value) => ok(value),
-        (failure) => err(failure === "internal" ? "internal-error" : failure),
-      );
+      return await run(params, context);
     } catch {
       return err("internal-error");
     }

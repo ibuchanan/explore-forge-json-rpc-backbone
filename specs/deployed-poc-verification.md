@@ -1,5 +1,9 @@
 # Deployed POC verification and decision record
 
+> **Historical record.** This describes the hand-written dispatcher and the
+> retired bearer-secret web trigger, which `forge-ahead-rpc` has replaced. See the
+> [main spec](spec.md) for the current design.
+
 <!-- cspell:words prosemirror prelint brotlied devb -->
 
 Originally recorded: 2026-10-24. Implementation baseline: `37bfac0` (Ticket 03).
@@ -436,5 +440,5 @@ the useful resolver/shared-command seam and propose removal of the web trigger.
 No removal or product API expansion is performed by this ticket.
 
 The next decision needs explicit target/live-operation approval, the
-[deployed HTTP procedure](../docs/how-to/prove-json-rpc.md),
+the retired bearer-secret HTTP procedure (removed),
 and the [installed-UI journey](../docs/how-to/prove-admin-ui.md).

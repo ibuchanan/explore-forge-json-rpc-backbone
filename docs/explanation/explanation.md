@@ -20,16 +20,17 @@ configuration prerequisite without claiming a third-party integration.
 This implemented seam prevents separate UI and HTTP implementations of the same
 operation. Fast local tests exercise it without a browser or server. Separate
 HTTP invocations can then test actual deployed persistence and authentication.
-An operator-reported 30-check HTTP run passed in approximately 10.48 seconds;
-that is an observation, not a general performance or reliability guarantee.
-The [V&V record](../../specs/deployed-poc-verification.md) retains its limits.
+An earlier operator-reported 30-check run used the retired bearer credential;
+it is an observation, not evidence for the current web trigger. The
+[V&V record](../../specs/deployed-poc-verification.md) retains its limits.
 
 ## Shared behavior does not mean shared authority
 
 The resolver derives identity from server-side Forge context and verifies Jira
 admin permission using an as-user call. The public web-trigger URL has no such
-identity; it checks a separately provisioned bearer credential. Neither claimed
-request fields nor a logged source name can turn that token into a Jira admin.
+identity; the package web trigger verifies Basic credentials against Jira and
+requires `ADMINISTER` on every request. Neither claimed request fields nor a
+logged source name can make a caller a Jira admin.
 
 `config.reset` makes this distinction concrete. Both paths recognize the command,
 but HTTP is forbidden even with a valid credential. The UI requires admin
@@ -70,13 +71,12 @@ executor, not in the transport or schema: valid confirmation and UI authorizatio
 are both required. A storage exception cannot impersonate a trusted command error,
 and a failed write is not automatically retried or rolled back.
 
-This is not yet a complete reusable command library or deployed native consumer.
-A [local product-event proof](../../specs/native-outcome-translation.md) now separates
-command outcomes from acknowledgment and explicit retry requests. Actual
-trigger-library reuse by an installed entry point remains unproven: the local
-fixture uses only its invocation-context type. Standalone generated validators
-check successful command output before adapter success. JSON-RPC remains a
-first-class supported adapter rather than becoming an incidental example. The
+This is not a deployed native-trigger consumer. The earlier
+[local product-event proof](../../specs/native-outcome-translation.md) was
+removed with the hand-written dispatcher; its findings remain as history. The
+`forge-ahead-rpc` package now supplies the dispatcher, generated validators and
+web trigger, and generated validators check successful command output before
+adapter success. JSON-RPC remains a first-class supported adapter. The
 [main spec](../../specs/spec.md) owns the remaining work; the
 [runtime reference](../reference/reference.md) records the implemented boundary.
 
@@ -103,8 +103,9 @@ a new command cannot compile until its app-owned handler is implemented.
 Generation supplies contracts and names, not handler bodies or authority.
 Implementations, input normalization/validation, and authorization stay
 handwritten; successful-output validation is generated. Prefix normalization
-illustrates the limit: length is validated after trimming, so
-blind validation of raw input can change behavior despite matching a schema.
+illustrates the limit: the schema bounds the raw value, and the handler then
+trims it and rejects an empty result, so the stored value can be shorter than
+the validated input.
 Generated types cannot enforce runtime length or resource authorization.
 
 The [extraction decision](../../specs/command-architecture-decision.md) keeps
@@ -118,17 +119,17 @@ visible rather than being hidden by a decorative import or a compensating wrappe
 
 ## What remains outside command integration coverage
 
-A passing HTTP suite does not establish event delivery, action input mapping,
+A passing local suite does not establish event delivery, action input mapping,
 resolver identity lookup in a live installation, retry scheduling, UI rendering,
-or backend/browser log secrecy. Local adapter tests and selected native journeys
-still matter. The installed UI and second-installation isolation remain unverified
-in the recorded live evidence, even though relevant local tests exist.
+or backend/browser log secrecy. Local adapter tests still matter. The installed
+UI, the current web trigger and
+second-installation isolation remain unverified in live evidence, even though
+relevant local tests exist.
 
-Observability helps explain these distinctions. The app records safe RPC
-invocation/outcome facts and numbered demo narratives, while the verifier names
-each assertion separately. An expected negative test can produce a rejection log
-and a passing check. A save-completed log is not its later read-back assertion.
-The current local run ID is not propagated into backend records.
+Observability helps explain these distinctions. The UI resolver records safe RPC
+invocation and outcome facts. An expected negative test can produce a rejection
+log and a passing check, and a save-completed log is not the later read-back
+assertion.
 
 ## What was not carried forward from the original exploration
 

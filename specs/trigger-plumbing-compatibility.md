@@ -1,5 +1,9 @@
 # Trigger-plumbing compatibility experiment
 
+> **Historical record.** This describes the hand-written dispatcher and the
+> retired bearer-secret web trigger, which `forge-ahead-rpc` has replaced. See the
+> [main spec](spec.md) for the current design.
+
 <!-- cspell:words prelint webtrigger -->
 
 Status: local evidence and proposed handoff delta, 2026-10-25. This is not a
