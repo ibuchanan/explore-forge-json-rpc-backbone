@@ -1,8 +1,11 @@
 import api, { route } from "@forge/api";
 import { makeResolver } from "@forge/resolver";
-import { dispatch } from "./commands";
+import { createAdoptedRpc } from "./adoption";
+import { logger } from "./logging";
 import type { RpcDefinitions } from "./rpc-types";
 import { store } from "./store";
+
+const { dispatch } = createAdoptedRpc({ store });
 
 export const handler = makeResolver<RpcDefinitions>({
   async rpc({ payload, context }) {
@@ -25,6 +28,31 @@ export const handler = makeResolver<RpcDefinitions>({
         // A failed permission check never authorizes storage access.
       }
     }
-    return dispatch(payload, { source: "ui", authorized }, store);
+    logger.info({ operation: "rpc.invoke", source: "ui" }, "RPC invoked");
+    const response = await dispatch(payload, {
+      caller: { source: "ui", authorized },
+      store,
+    });
+    const code = "error" in response ? response.error.code : undefined;
+    const log =
+      code === -32603
+        ? logger.error
+        : code === undefined
+          ? logger.info
+          : logger.warn;
+    log(
+      {
+        operation: "rpc.complete",
+        outcome:
+          code === undefined
+            ? "succeeded"
+            : code === -32603
+              ? "failed"
+              : "rejected",
+        ...(code !== undefined && { rpcCode: code }),
+      },
+      code === undefined ? "RPC completed" : "RPC returned a sanitized error",
+    );
+    return response;
   },
 });

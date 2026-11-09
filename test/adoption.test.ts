@@ -38,7 +38,7 @@ it("runs the documented commands through the package dispatcher with app-owned p
   ).toEqual({
     jsonrpc: "2.0",
     id: 2,
-    error: { code: -32000, message: "Command failed" },
+    error: { code: -32002, message: "Not configured" },
   });
   expect(
     await dispatch(request("config.set", { prefix: "  hi  " }, 3), context),
@@ -196,7 +196,14 @@ it("verifies a Jira admin on every request and exposes only reviewed read method
       (m: { name: string }) => m.name,
     ),
   ).toEqual(["config.get", "integration.preview"]);
-  expect(requestJira).toHaveBeenCalledTimes(8);
+  expect(
+    JSON.parse((await call("integration.preview", { text: "hi" })).body),
+  ).toEqual({
+    jsonrpc: "2.0",
+    id: 9,
+    error: { code: -32002, message: "Not configured" },
+  });
+  expect(requestJira).toHaveBeenCalledTimes(10);
   expect(store.set).not.toHaveBeenCalled();
   expect(store.reset).not.toHaveBeenCalled();
 });

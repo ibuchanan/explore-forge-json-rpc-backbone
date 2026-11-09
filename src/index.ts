@@ -27,5 +27,5 @@ export function run(
   event: WebTriggerRequest,
   context?: { installContext: string },
 ): Promise<WebTriggerResponse> {
-  return trigger(event, context ?? { installContext: "" });
+  return trigger(event, context);
 }

@@ -18,8 +18,11 @@ type Failure =
   | "forbidden"
   | "method-not-found"
   | "invalid-params"
-  | "command-failed"
+  | "not-configured"
   | "internal-error";
+const errorMap = {
+  "not-configured": { code: -32002, message: "Not configured" },
+} as const;
 
 // The app owns normalization, authorization and storage. This adapter does not
 // turn an application failure into a transport policy or retry instruction.
@@ -40,14 +43,7 @@ const adapt =
       const result = await run(params, context);
       return result.match(
         (value) => ok(value),
-        (failure) =>
-          err(
-            failure === "internal"
-              ? "internal-error"
-              : failure === "not-configured"
-                ? "command-failed"
-                : failure,
-          ),
+        (failure) => err(failure === "internal" ? "internal-error" : failure),
       );
     } catch {
       return err("internal-error");
@@ -66,11 +62,13 @@ export function createAdoptedRpc({ store }: { store: PrefixStore }) {
     handlers: appHandlers,
     inputValidators,
     outputValidators,
+    errorMap,
   });
   const web = createWebDispatcher({
     handlers: appHandlers,
     inputValidators,
     outputValidators,
+    errorMap,
     webPolicy,
     catalog,
     // Exposure is none until a reviewed per-installation selection is supplied.
@@ -91,6 +89,7 @@ export function createAdoptedWebtrigger(options: {
     handlers: appHandlers,
     inputValidators,
     outputValidators,
+    errorMap,
     webPolicy,
     catalog,
     installation: (context: { installContext?: string }) =>
