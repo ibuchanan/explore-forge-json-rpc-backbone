@@ -9,7 +9,20 @@
  * the first failed check. Stdout carries a sanitized JSON report; stderr carries
  * one line per check.
  */
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
+
+const exec = promisify(execFile);
+type CommandRunner = (command: string, args: string[]) => Promise<string>;
+const runCommand: CommandRunner = async (command, args) => {
+  const { stdout } = await exec(command, args, {
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: 1_048_576,
+  });
+  return stdout;
+};
 
 type Env = Record<string, string | undefined>;
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -30,7 +43,7 @@ type Auth = "valid" | "invalid" | "none";
 
 function settings(env: Env) {
   const missing = [
-    "RPC_VERIFY_URL",
+    "FORGE_SITE",
     "RPC_VERIFY_EMAIL",
     "RPC_VERIFY_API_TOKEN",
   ].filter((name) => !env[name]);
@@ -51,25 +64,73 @@ function settings(env: Env) {
     throw new PreconditionError(
       "RPC_VERIFY_EMAIL or RPC_VERIFY_API_TOKEN is malformed.",
     );
+  const site = env["FORGE_SITE"] ?? "";
+  if (!/^[a-z0-9-]+\.atlassian\.net$/i.test(site))
+    throw new PreconditionError(
+      "FORGE_SITE must be an Atlassian site hostname.",
+    );
+  return { site, email, token };
+}
+
+async function discoverUrl(
+  site: string,
+  command: CommandRunner,
+): Promise<string> {
+  let listing: unknown;
+  try {
+    listing = JSON.parse(
+      await command("forge", [
+        "webtrigger",
+        "list",
+        "--functionKey",
+        "config-rpc",
+        "--site",
+        site,
+        "--product",
+        "jira",
+        "--environment",
+        "development",
+        "--json",
+      ]),
+    );
+  } catch {
+    throw new PreconditionError(
+      "Could not list Forge web triggers. Check Forge CLI authentication, installation and JSON output support.",
+    );
+  }
+  if (!Array.isArray(listing))
+    throw new PreconditionError("Unexpected Forge web trigger listing format.");
+  const matches = listing.filter((row) => row?.triggerKey === "config-rpc");
+  if (matches.length === 0)
+    throw new PreconditionError(
+      "No config-rpc URL exists for the selected installation. Create it separately with forge webtrigger create before probing.",
+    );
+  if (matches.length !== 1)
+    throw new PreconditionError(
+      "Multiple config-rpc URLs exist for the selected installation; resolve the ambiguity before probing.",
+    );
   let url: URL;
   try {
-    url = new URL(env["RPC_VERIFY_URL"] ?? "");
+    if (typeof matches[0].url !== "string") throw new Error();
+    url = new URL(matches[0].url);
   } catch {
-    throw new PreconditionError("RPC_VERIFY_URL is not a valid URL.");
+    throw new PreconditionError("Forge returned an invalid web trigger URL.");
   }
   if (url.protocol !== "https:" || url.username || url.password)
     throw new PreconditionError(
-      "RPC_VERIFY_URL must be https without credentials.",
+      "Forge web trigger URL must be https without credentials.",
     );
-  return { url: url.href, email, token };
+  return url.href;
 }
 
 export async function verifyWebtrigger(
   env: Env,
   fetcher: Fetcher = fetch,
   log: (line: string) => void = () => {},
+  command: CommandRunner = runCommand,
 ): Promise<Report> {
-  const { url, email, token } = settings(env);
+  const { site, email, token } = settings(env);
+  const url = await discoverUrl(site, command);
   const basic = (value: string) =>
     `Basic ${Buffer.from(`${email}:${value}`).toString("base64")}`;
   const authorization: Record<Auth, string | undefined> = {

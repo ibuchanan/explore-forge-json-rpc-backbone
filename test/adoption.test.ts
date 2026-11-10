@@ -1,6 +1,9 @@
 import { expect, it, vi } from "vitest";
 import { createAdoptedRpc, createAdoptedWebtrigger } from "../src/adoption";
-import { run } from "../src/index";
+const installation = {
+  id: "ari:cloud:ecosystem::installation/one",
+  jiraSiteUrl: "https://example.atlassian.net",
+};
 
 const memory = () => {
   let prefix: string | undefined;
@@ -55,40 +58,12 @@ it("runs the documented commands through the package dispatcher with app-owned p
   expect(store.reset).toHaveBeenCalledTimes(1);
 });
 
-it("uses the adopted web adapter from the Forge entry and fails closed without site binding", async () => {
-  const prior = process.env["RPC_BEARER_SECRET"];
-  process.env["RPC_BEARER_SECRET"] = "old-secret";
-  try {
-    const response = await run(
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": ["application/json"],
-          Authorization: ["Bearer old-secret"],
-        },
-        body: JSON.stringify(request("config.get", {}, 1)),
-        path: "/",
-        queryParameters: {},
-      },
-      { installContext: "ari:cloud:ecosystem::installation/unconfigured" },
-    );
-    expect(response.statusCode).toBe(503);
-  } finally {
-    if (prior === undefined) delete process.env["RPC_BEARER_SECRET"];
-    else process.env["RPC_BEARER_SECRET"] = prior;
-  }
-});
-
 it("fails closed without a trusted installation binding or acknowledged audit publisher", async () => {
   const store = memory();
   const requestJira = vi.fn();
   const trigger = createAdoptedWebtrigger({
     store,
     requestJira,
-    installation: {
-      id: "ari:cloud:ecosystem::installation/one",
-      jiraSiteUrl: "https://example.atlassian.net",
-    },
   });
   const event = {
     method: "POST",
@@ -98,13 +73,7 @@ it("fails closed without a trusted installation binding or acknowledged audit pu
     },
     body: JSON.stringify(request("config.set", { prefix: "bad" }, 9)),
   };
-  expect(
-    (
-      await trigger(event, {
-        installContext: "ari:cloud:ecosystem::installation/other",
-      })
-    ).statusCode,
-  ).toBe(503);
+  expect((await trigger(event, {})).statusCode).toBe(503);
   expect(requestJira).not.toHaveBeenCalled();
   expect(store.set).not.toHaveBeenCalled();
 });
@@ -122,10 +91,6 @@ it("denies a verified account without Jira ADMINISTER before any store access", 
   const trigger = createAdoptedWebtrigger({
     store,
     requestJira,
-    installation: {
-      id: "ari:cloud:ecosystem::installation/one",
-      jiraSiteUrl: "https://example.atlassian.net",
-    },
   });
   const response = await trigger(
     {
@@ -136,7 +101,7 @@ it("denies a verified account without Jira ADMINISTER before any store access", 
       },
       body: JSON.stringify(request("config.get", {}, 1)),
     },
-    { installContext: "ari:cloud:ecosystem::installation/one" },
+    { installation },
   );
   expect(response.statusCode).toBe(403);
   expect(store.get).not.toHaveBeenCalled();
@@ -155,10 +120,6 @@ it("verifies a Jira admin on every request and exposes only reviewed read method
   const trigger = createAdoptedWebtrigger({
     store,
     requestJira,
-    installation: {
-      id: "ari:cloud:ecosystem::installation/one",
-      jiraSiteUrl: "https://example.atlassian.net",
-    },
   });
   const call = async (method: string, params: object = {}) =>
     trigger(
@@ -170,7 +131,7 @@ it("verifies a Jira admin on every request and exposes only reviewed read method
         },
         body: JSON.stringify(request(method, params, 9)),
       },
-      { installContext: "ari:cloud:ecosystem::installation/one" },
+      { installation },
     );
   expect(JSON.parse((await call("config.get")).body)).toEqual({
     jsonrpc: "2.0",

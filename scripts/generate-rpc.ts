@@ -12,7 +12,7 @@ const outputs = generateContract(
 );
 const catalog = JSON.parse(readFileSync(source, "utf8"));
 const files = {
-  "catalog.ts": `// Generated from ${source}; do not edit.\nexport const catalog = ${JSON.stringify(catalog)};\n`,
+  "catalog.ts": `// Generated from ${source}; do not edit.\nimport type { OpenRpcDocument } from "forge-ahead-rpc";\nexport const catalog = ${JSON.stringify(catalog)} as unknown as OpenRpcDocument;\n`,
   "contract.ts": outputs.contract,
   "validators.js": outputs.validators,
   "validators.d.ts": outputs.declarations,

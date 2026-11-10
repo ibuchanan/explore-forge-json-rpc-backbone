@@ -28,11 +28,11 @@ Do not put credential values in the declaration or commit them anywhere.
 | `FORGE_PRODUCT`     | `shared_config` | Installation product; defaults to `jira`           |
 | `FORGE_ENVIRONMENT` | `shared_config` | Local Forge target; defaults to `development`      |
 
-`RPC_INSTALLATION_ARI` and `RPC_JIRA_SITE_URL` (`project_config`) are the only
-members of `[scopes.runtime]`; `npm run forge:variables:set` uploads them. The
-web trigger needs no shared credential. `RPC_VERIFY_URL`, `RPC_VERIFY_EMAIL`
-and `RPC_VERIFY_API_TOKEN` stay local for the live check below. The `FORGE_*`
-controls are never uploaded. This app has no `manifest` scope. A SecretSpec
+The web trigger discovers its installation and Jira site through Forge; no
+runtime variables or shared credential are required. No runtime scope is
+declared. `RPC_VERIFY_EMAIL` and `RPC_VERIFY_API_TOKEN` stay
+local for the live check below. The `FORGE_*` controls are never uploaded.
+This app has no `manifest` scope. A SecretSpec
 profile is not a Forge environment; keep profile `default` for these examples
 and review `FORGE_ENVIRONMENT` separately.
 
@@ -69,37 +69,36 @@ The dotenv file is plaintext; store no credentials in it.
 
 ## Configure the web trigger
 
-`src/index.ts` reads `RPC_INSTALLATION_ARI` and `RPC_JIRA_SITE_URL` (an
-`https://<site>.atlassian.net` origin) from the runtime environment. Until both
-are set and the request's Forge `installContext` matches the ARI, every web
-request returns `503`. The ARI is known only after installation, so use a
-placeholder for the first deploy and upload the real value afterward. Callers
-authenticate with HTTP Basic credentials (a Jira user's email and API token);
-the trigger verifies on each request that the user holds Jira `ADMINISTER`. Only
-methods marked `x-forge-ahead.web` in the OpenRPC catalog and selected in
-`src/adoption.ts` are reachable.
+No installation or site environment variables are needed. On each invocation,
+`src/index.ts` gets the installation ARI from `getAppContext()` and discovers
+the Jira `baseUrl` using `api.asApp().requestJira` on `/rest/api/3/serverInfo`.
+Discovery failure or an invalid site URL returns `503` without forwarding
+caller credentials.
 
-Bind the aliases, then store the values. `project_config` holds non-secret
-values; bind `project_secrets` to an approved secret backend, never dotenv:
-
-```sh
-secretspec set --provider project_config --profile default RPC_INSTALLATION_ARI
-secretspec set --provider project_config --profile default RPC_JIRA_SITE_URL
-npm run forge:variables:set
-```
+Callers authenticate with HTTP Basic credentials (a Jira user's email and API
+token). The app uses Forge `fetch` against the discovered site to verify the
+caller holds Jira `ADMINISTER` on every request. Only methods marked
+`x-forge-ahead.web` in the OpenRPC catalog and selected in `src/adoption.ts`
+are reachable.
 
 ## Check the deployed web trigger
 
 `npm run test:deployed` runs `scripts/verify-webtrigger.ts` under
-`secretspec run`. It needs a development Jira installation whose runtime
-variables are set. Store the local inputs once; the URL comes from
-`forge webtrigger create` for the `config-rpc` function:
+`secretspec run`. It needs a development Jira installation. Bind
+`project_config` for non-secret inputs and `project_secrets` to an approved
+secret backend, never dotenv. Store the local verification credentials once:
 
 ```sh
-secretspec set --provider project_config --profile default RPC_VERIFY_URL
 secretspec set --provider project_config --profile default RPC_VERIFY_EMAIL
 secretspec set --provider project_secrets --profile default RPC_VERIFY_API_TOKEN
 ```
+
+The probe discovers the existing endpoint using `forge webtrigger list --json`
+with `--functionKey config-rpc` and the SecretSpec-resolved `FORGE_SITE`,
+`FORGE_PRODUCT` and `FORGE_ENVIRONMENT` targets. Forge CLI must be installed
+and authenticated. No URL is stored. Missing or ambiguous URLs stop the probe;
+it never creates one. If none exists, run `forge webtrigger create` separately
+for the selected development Jira installation and `config-rpc` trigger.
 
 The account must be a Jira administrator on `FORGE_SITE`. The check is
 read-only: it probes authentication, method and media-type rejection, discovery,

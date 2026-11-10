@@ -47,9 +47,11 @@ Two entry points share that dispatcher and one Forge KVS store:
   generated command files and their generator are removed. No parallel stack
   remains. Handlers take typed parameters and do not re-validate shapes.
 - **Authority is per entry point, not per secret.** The shared bearer credential
-  and `RPC_BEARER_SECRET` are retired. The web trigger fails closed (503) until
-  `RPC_INSTALLATION_ARI` and `RPC_JIRA_SITE_URL` are set, and a request's
-  `installContext` must match the ARI. Callers must be Jira administrators.
+  and `RPC_BEARER_SECRET` are retired. The entry point reads the installation
+  ARI from `getAppContext()` and discovers the installed Jira site's `baseUrl`
+  using an as-app `/rest/api/3/serverInfo` request on each invocation. Discovery
+  failure returns 503. Forge `fetch` separately verifies the caller's API token
+  and Jira administrator permission on that site.
 - **Exposure is reviewed metadata.** Web reachability is declared in the
   catalog (`x-forge-ahead`), mirrored into a generated policy that the library
   checks for drift, and then selected in app code. `rpc.discover` lists only
@@ -64,8 +66,8 @@ Two entry points share that dispatcher and one Forge KVS store:
 - **Contract generation.** `npm run generate:rpc` regenerates
   `src/generated/rpc/`; `generate:rpc:check` fails on drift and is part of
   `npm run check`. Generated files are never edited by hand.
-- **Runtime configuration.** The two web trigger variables are declared in
-  `secretspec.toml` under `[scopes.runtime]`. Local live-check inputs stay out
+- **Runtime configuration.** No web trigger installation or site variables
+  are needed; no runtime scope is declared. Local live-check inputs stay out
   of every scope.
 
 ## Testing Decisions

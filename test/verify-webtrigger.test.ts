@@ -12,10 +12,13 @@ const installation = {
 const env = {
   FORGE_ENVIRONMENT: "development",
   FORGE_PRODUCT: "jira",
-  RPC_VERIFY_URL: "https://trigger.example.test/x/y",
+  FORGE_SITE: "example.atlassian.net",
   RPC_VERIFY_EMAIL: "admin@example.com",
   RPC_VERIFY_API_TOKEN: "private-api-token",
 };
+const triggerUrl = "https://trigger.example.test/x/y";
+const command = async () =>
+  JSON.stringify([{ id: "one", triggerKey: "config-rpc", url: triggerUrl }]);
 const valid = `Basic ${Buffer.from(`${env.RPC_VERIFY_EMAIL}:${env.RPC_VERIFY_API_TOKEN}`).toString("base64")}`;
 
 /** The real adopted web trigger behind a fake Jira, reached through fetch. */
@@ -32,7 +35,6 @@ function endpoint(initial?: string) {
   };
   const trigger = createAdoptedWebtrigger({
     store,
-    installation,
     requestJira: async (url, authorization) =>
       authorization !== valid
         ? { status: 401, body: {} }
@@ -55,7 +57,7 @@ function endpoint(initial?: string) {
         ),
         body: init.body as string,
       },
-      { installContext: installation.id },
+      { installation },
     );
     return new Response(response.body, { status: response.statusCode });
   });
@@ -67,7 +69,12 @@ it.each([undefined, "pre-😀"])(
   async (saved) => {
     const { fetcher, store } = endpoint(saved);
     const lines: string[] = [];
-    const report = await verifyWebtrigger(env, fetcher, (l) => lines.push(l));
+    const report = await verifyWebtrigger(
+      env,
+      fetcher,
+      (l) => lines.push(l),
+      command,
+    );
     expect(report.status).toBe("passed");
     expect(report.checks).toHaveLength(10);
     expect(store.set).not.toHaveBeenCalled();
@@ -76,7 +83,7 @@ it.each([undefined, "pre-😀"])(
     for (const sensitive of [
       env.RPC_VERIFY_API_TOKEN,
       env.RPC_VERIFY_EMAIL,
-      env.RPC_VERIFY_URL,
+      triggerUrl,
       "pre-😀",
     ])
       expect(output).not.toContain(sensitive);
@@ -87,7 +94,7 @@ it("stops at the first failed check and reports it without response data", async
   const fetcher = vi.fn(
     async () => new Response("private-body", { status: 200 }),
   );
-  const report = await verifyWebtrigger(env, fetcher);
+  const report = await verifyWebtrigger(env, fetcher, undefined, command);
   expect(report).toEqual({
     status: "failed",
     checks: [
@@ -105,15 +112,16 @@ it("sanitizes transport failures", async () => {
   const fetcher = vi.fn(async () => {
     throw new Error("private-host.example.test refused");
   });
-  const report = await verifyWebtrigger(env, fetcher);
+  const report = await verifyWebtrigger(env, fetcher, undefined, command);
   expect(report.status).toBe("failed");
   expect(JSON.stringify(report)).not.toContain("private-host");
 });
 
 it.each([
   [{ RPC_VERIFY_API_TOKEN: undefined }, "RPC_VERIFY_API_TOKEN"],
-  [{ RPC_VERIFY_URL: "http://insecure.example.test" }, "https"],
-  [{ RPC_VERIFY_URL: "https://user:pass@trigger.example.test" }, "https"],
+  [{ FORGE_SITE: undefined }, "FORGE_SITE"],
+  [{ FORGE_SITE: "--site=elsewhere" }, "hostname"],
+  [{ FORGE_SITE: "https://example.atlassian.net" }, "hostname"],
   [{ FORGE_ENVIRONMENT: "production" }, "FORGE_ENVIRONMENT=development"],
   [{ RPC_VERIFY_EMAIL: "bad email" }, "malformed"],
 ])("refuses to start with %o", async (override, message) => {
@@ -121,8 +129,91 @@ it.each([
   const failure = await verifyWebtrigger(
     { ...env, ...override },
     fetcher,
+    undefined,
+    command,
   ).catch((error: unknown) => error);
   expect(failure).toBeInstanceOf(PreconditionError);
   expect((failure as Error).message).toContain(message);
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it("lists the exact target without putting verification credentials in CLI arguments", async () => {
+  const run = vi.fn(command);
+  const { fetcher } = endpoint();
+  const report = await verifyWebtrigger(env, fetcher, undefined, run);
+  expect(report.status).toBe("passed");
+  expect(run.mock.calls).toEqual([
+    [
+      "forge",
+      [
+        "webtrigger",
+        "list",
+        "--functionKey",
+        "config-rpc",
+        "--site",
+        env.FORGE_SITE,
+        "--product",
+        "jira",
+        "--environment",
+        "development",
+        "--json",
+      ],
+    ],
+  ]);
+  expect(fetcher.mock.calls.every(([url]) => url === triggerUrl)).toBe(true);
+});
+
+it.each([
+  ["[]", "No config-rpc URL"],
+  [
+    JSON.stringify([{ triggerKey: "other", url: triggerUrl }]),
+    "No config-rpc URL",
+  ],
+  [
+    JSON.stringify([
+      { triggerKey: "config-rpc", url: triggerUrl },
+      { triggerKey: "config-rpc", url: triggerUrl },
+    ]),
+    "Multiple",
+  ],
+  ["{}", "format"],
+  ["not JSON", "Could not list"],
+  [JSON.stringify([{ triggerKey: "config-rpc" }]), "invalid"],
+  [
+    JSON.stringify([{ triggerKey: "config-rpc", url: "http://insecure.test" }]),
+    "https",
+  ],
+  [
+    JSON.stringify([
+      {
+        triggerKey: "config-rpc",
+        url: "https://user:pass@trigger.example.test",
+      },
+    ]),
+    "https",
+  ],
+])(
+  "does not probe unsafe or missing CLI results: %s",
+  async (stdout, message) => {
+    const fetcher = vi.fn();
+    const failure = await verifyWebtrigger(
+      env,
+      fetcher,
+      undefined,
+      async () => stdout,
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(PreconditionError);
+    expect((failure as Error).message).toContain(message);
+    expect(fetcher).not.toHaveBeenCalled();
+  },
+);
+
+it("sanitizes CLI failures without issuing an HTTP request", async () => {
+  const fetcher = vi.fn();
+  const failure = await verifyWebtrigger(env, fetcher, undefined, async () => {
+    throw new Error(`private CLI failure ${triggerUrl}`);
+  }).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(PreconditionError);
+  expect((failure as Error).message).not.toContain(triggerUrl);
   expect(fetcher).not.toHaveBeenCalled();
 });

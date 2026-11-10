@@ -33,7 +33,7 @@
     "size:check": "npm run build && size-limit",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "test:deployed": "secretspec run --scope '' -- node --experimental-strip-types scripts/verify-webtrigger.ts",
+    "test:deployed": "secretspec run --scope '' -- bun run scripts/verify-webtrigger.ts",
     "test:watch": "vitest watch --passWithNoTests",
     "todo": "git grep -n -I -F TO\"DO\" -- .; status=$?; if [ \"$status\" -eq 1 ]; then echo \"No TO\"\"DO markers found.\"; elif [ \"$status\" -ne 0 ]; then exit \"$status\"; fi",
     "typecheck": "tsc --project tsconfig.typecheck.json --noEmit"
@@ -46,7 +46,7 @@
     "@forge/kvs": "^2.1",
     "@forge/react": "^12.5",
     "@forge/resolver": "^2.0",
-    "forge-ahead-rpc": "file:../forge-ahead-rpc",
+    "forge-ahead-rpc": "github:ibuchanan/forge-ahead-rpc",
     "react": "^18.3"
   },
   "devDependencies": {

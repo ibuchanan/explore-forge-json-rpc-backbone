@@ -1,9 +1,6 @@
 import { err, type Result } from "@forge-ahead/errors";
 import { createDispatcher, createWebDispatcher } from "forge-ahead-rpc";
-import {
-  createJiraAdminAuthenticator,
-  createWebtrigger,
-} from "forge-ahead-rpc/webtrigger";
+import { createWebtrigger } from "forge-ahead-rpc/webtrigger";
 import {
   type CommandFailure,
   type Context,
@@ -17,10 +14,16 @@ import {
   outputValidators,
 } from "./generated/rpc/validators.js";
 import { webPolicy } from "./generated/rpc/web-policy";
+import { createJiraAdminAuthenticator } from "./jira-admin-authenticator";
 import { rpcErrors } from "./rpc-errors";
 
 type Failure = CommandFailure | "internal-error";
-const errorMap = { "not-configured": rpcErrors["not-configured"] } as const;
+const errorCatalog = {
+  "not-configured": {
+    code: rpcErrors["not-configured"].code,
+    title: rpcErrors["not-configured"].message,
+  },
+} as const;
 
 // The app owns normalization, authorization and storage. This adapter does not
 // turn an application failure into a transport policy or retry instruction.
@@ -56,13 +59,13 @@ export function createAdoptedRpc({ store }: { store: PrefixStore }) {
     handlers: appHandlers,
     inputValidators,
     outputValidators,
-    errorMap,
+    errorCatalog,
   });
   const web = createWebDispatcher({
     handlers: appHandlers,
     inputValidators,
     outputValidators,
-    errorMap,
+    errorCatalog,
     webPolicy,
     catalog,
     // Exposure is none until a reviewed per-installation selection is supplied.
@@ -70,27 +73,24 @@ export function createAdoptedRpc({ store }: { store: PrefixStore }) {
   return { dispatch, web, store };
 }
 
-/** Only a Forge-provided installation ARI may select the configured Jira site. */
+/** The entry point supplies installation and site data resolved through Forge. */
 export function createAdoptedWebtrigger(options: {
   store: PrefixStore;
   requestJira: (
     url: string,
     authorization: string,
   ) => Promise<{ status: number; body: unknown }>;
-  installation?: { id: string; jiraSiteUrl: string } | undefined;
 }) {
   return createWebtrigger({
     handlers: appHandlers,
     inputValidators,
     outputValidators,
-    errorMap,
+    errorCatalog,
     webPolicy,
     catalog,
-    installation: (context: { installContext?: string }) =>
-      context.installContext &&
-      context.installContext === options.installation?.id
-        ? options.installation
-        : undefined,
+    installation: (context: {
+      installation?: { id: string; jiraSiteUrl: string } | undefined;
+    }) => context.installation,
     authenticate: createJiraAdminAuthenticator(options.requestJira),
     context: (_installation, _principal) => ({
       caller: { source: "api" as const, authorized: true },

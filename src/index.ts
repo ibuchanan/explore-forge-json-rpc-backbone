@@ -1,19 +1,15 @@
-import type { WebTriggerRequest, WebTriggerResponse } from "@forge/api";
+import api, {
+  fetch,
+  getAppContext,
+  route,
+  type WebTriggerRequest,
+  type WebTriggerResponse,
+} from "@forge/api";
 import { createAdoptedWebtrigger } from "./adoption";
 import { store } from "./store";
 
-// A site URL is never derived from a request. A missing or mismatched
-// installation/site configuration keeps the webtrigger unavailable.
-const installationId = process.env["RPC_INSTALLATION_ARI"];
-const jiraSiteUrl = process.env["RPC_JIRA_SITE_URL"];
 const trigger = createAdoptedWebtrigger({
   store,
-  installation:
-    installationId &&
-    jiraSiteUrl &&
-    /^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/i.test(jiraSiteUrl)
-      ? { id: installationId, jiraSiteUrl }
-      : undefined,
   requestJira: async (url, authorization) => {
     const response = await fetch(url, {
       headers: { Authorization: authorization },
@@ -23,9 +19,29 @@ const trigger = createAdoptedWebtrigger({
   },
 });
 
-export function run(
+export async function run(
   event: WebTriggerRequest,
-  context?: { installContext: string },
 ): Promise<WebTriggerResponse> {
-  return trigger(event, context);
+  let installation: { id: string; jiraSiteUrl: string } | undefined;
+  try {
+    // Resolve the site through Forge, never from caller-controlled HTTP input.
+    const id = getAppContext().installationAri.toString();
+    if (!/^ari:cloud:ecosystem::installation\/[^/\s]+$/.test(id))
+      throw new Error("Installation context unavailable");
+    const response = await api
+      .asApp()
+      .requestJira(route`/rest/api/3/serverInfo`);
+    if (response.ok) {
+      const body: unknown = await response.json();
+      const baseUrl = (body as { baseUrl?: unknown } | null)?.baseUrl;
+      if (
+        typeof baseUrl === "string" &&
+        /^https:\/\/[a-z0-9-]+\.atlassian\.net\/?$/i.test(baseUrl)
+      )
+        installation = { id, jiraSiteUrl: new URL(baseUrl).origin };
+    }
+  } catch {
+    // Discovery failure must never forward caller credentials or access storage.
+  }
+  return trigger(event, { installation });
 }

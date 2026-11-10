@@ -144,9 +144,13 @@ The `config-rpc` v2 dynamic web-trigger module maps to function `rpc`, handler
 `src/adoption.ts`. Its response uses Forge's array-valued headers and a JSON
 string body.
 
-The trigger needs `RPC_INSTALLATION_ARI` and `RPC_JIRA_SITE_URL`, and the
-request's Forge `installContext` must equal the ARI. Without them every request
-returns `503`. Jira calls use the manifest's `https://*.atlassian.net` egress.
+The entry point reads the installation ARI from `getAppContext()` and resolves
+the installed Jira site's `baseUrl` through an as-app request to
+`/rest/api/3/serverInfo` on each invocation. No installation or site runtime
+variables are required. Discovery failure or an invalid HTTPS Atlassian site
+origin returns `503` before caller credentials are forwarded. Caller-token
+verification uses Forge `fetch` and the manifest's `https://*.atlassian.net`
+egress; the discovery request does not authenticate the external caller.
 Body limit is 65,536 bytes. Content type is `application/json`,
 case-insensitive, optionally followed by `; charset=utf-8`. Query parameters,
 duplicate headers and credential-like keys inside `params` are rejected.
