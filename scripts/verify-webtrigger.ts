@@ -141,12 +141,12 @@ export async function verifyWebtrigger(
 
   async function send(
     body: unknown,
-    options: { auth?: Auth; method?: string; contentType?: string } = {},
+    options: { mode?: Auth; method?: string; contentType?: string } = {},
   ): Promise<Probe> {
     const headers: Record<string, string> = {
       "Content-Type": options.contentType ?? "application/json",
     };
-    const credential = authorization[options.auth ?? "valid"];
+    const credential = authorization[options.mode ?? "valid"];
     if (credential) headers["Authorization"] = credential;
     const method = options.method ?? "POST";
     const response = await fetcher(url, {
@@ -207,12 +207,12 @@ export async function verifyWebtrigger(
     [
       "rejects a request without credentials",
       async () =>
-        expectStatus(await send(rpc("config.get"), { auth: "none" }), 401),
+        expectStatus(await send(rpc("config.get"), { mode: "none" }), 401),
     ],
     [
       "rejects invalid credentials",
       async () =>
-        expectStatus(await send(rpc("config.get"), { auth: "invalid" }), 401),
+        expectStatus(await send(rpc("config.get"), { mode: "invalid" }), 401),
     ],
     [
       "rejects a GET",

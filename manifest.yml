@@ -40,11 +40,14 @@ app:
 permissions:
   scopes:
     - storage:app
+    # Accept the risk classic scope for Jira permission checks
+    # because this is a reference implementation.
+    # ast-grep-ignore: no-classic-product-scopes
     - read:jira-work
   external:
     fetch:
       backend:
-        - https://*.atlassian.net
+        - address: https://*.atlassian.net
 resources:
   - key: config-ui
     path: src/frontend/index.tsx

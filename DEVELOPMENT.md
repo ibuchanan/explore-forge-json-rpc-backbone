@@ -32,7 +32,16 @@ The web trigger discovers its installation and Jira site through Forge; no
 runtime variables or shared credential are required. No runtime scope is
 declared. `RPC_VERIFY_EMAIL` and `RPC_VERIFY_API_TOKEN` stay
 local for the live check below. The `FORGE_*` controls are never uploaded.
-This app has no `manifest` scope. A SecretSpec
+This app has no `manifest` scope. Forge lint uses `secretspec.lint.toml`,
+which reads only `FORGE_ENVIRONMENT` from the environment (default `development`)
+and does not require provider aliases or live-probe credentials. A separate
+file avoids SecretSpec's default-profile inheritance. Deployment and live
+probes still use `secretspec.toml`. Local lint acknowledges `MAJOR_VERSION_RULE`
+so a pending version upgrade does not fail static checks; deployment and
+installation approval requirements remain unchanged. Prelint disables only
+`use-forge-ahead-api-types`: this app validates untrusted Jira responses at
+runtime and keeps small local response shapes, so the optional generated-types
+dependency is not needed. A SecretSpec
 profile is not a Forge environment; keep profile `default` for these examples
 and review `FORGE_ENVIRONMENT` separately.
 

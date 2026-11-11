@@ -38,7 +38,7 @@ function requestFailure(status: number) {
 // Adapted from forge-ahead-rpc's consumer fixture; intentionally app-owned.
 /** Internal-use Jira admin verifier; not suitable for distributable apps. */
 export function createJiraAdminAuthenticator(
-  requestJira: (
+  fetchJiraWithToken: (
     url: string,
     authorization: string,
   ) => Promise<{ status: number; body: unknown }>,
@@ -51,7 +51,7 @@ export function createJiraAdminAuthenticator(
     try {
       const origin = trustedSiteOrigin(installation.jiraSiteUrl);
       if (!origin) return unavailable;
-      const myself = await requestJira(
+      const myself = await fetchJiraWithToken(
         `${origin}/rest/api/3/myself`,
         authorization,
       );
@@ -60,7 +60,7 @@ export function createJiraAdminAuthenticator(
       const accountId = (myself.body as { accountId?: unknown } | null)
         ?.accountId;
       if (typeof accountId !== "string" || !accountId) return unavailable;
-      const permissions = await requestJira(
+      const permissions = await fetchJiraWithToken(
         `${origin}/rest/api/3/mypermissions?permissions=ADMINISTER`,
         authorization,
       );
